@@ -1,0 +1,56 @@
+# Node.js specific
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependency directories
+node_modules/
+.pnpm/
+.eslintcache
+.cache/
+
+# Production build directories
+build/
+dist/
+out/
+
+# Ignore user data files
+userdata/*
+
+# Optional npm cache directory
+.npm/
+
+# Ignore Redis database files
+dump.rdb
+*.rdb
+appendonly.aof
+
+# VSCode settings
+.vscode/
+
+# Ignore Git ignored modules or dependencies
+.DS_Store
+
+# MongoDB database files
+*.lock
+*.log
+mongodump/
+
+# Ignore compiled code (optional if your project has build steps)
+*.o
+*.so
+*.d
+
+# Ignore any output files created by utilities
+utils/output/
