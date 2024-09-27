@@ -53,17 +53,31 @@ Before running the bot, ensure you have the following installed:
 
 ```bash
 📦 Project Root
-├── 📁 server/
-│   ├── user.js     
-│   ├── post.js     
-├── 📁 userdata/     
-├── 📁 utils/       
-│   ├── convertor.js
-│   ├── download.js
-│   └── sendVoiceMessage.js
-├── 📄 bot.js        
-├── 📄 .env          
-└── 📄 README.md    
+/
+├── handler
+│   ├── main.js               
+│   └── music.js               
+├── server
+│   ├── /api                   
+│   │   ├── user.js           
+│   └── /database            
+│       ├── post.js            
+│       ├── users.js         
+│       ├── db.config.js     
+│       └── index.js           
+├── /userdata                 
+├── /utils                     
+│   ├── converter.js           
+│   ├── downloader.js         
+│   └── sendVoiceMessage.js   
+├── .env                       
+├── bot.js                     
+├── colors.config.js          
+├── redis.config.js           
+├── responses.js              
+├── package.json              
+└── README.md                 
+
 ```
 
 ## 📦 Installation
