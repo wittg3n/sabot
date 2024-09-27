@@ -67,7 +67,7 @@ module.exports = {
                     const songDuration = await getAudioDuration(audioFilePath);
 
                     if ((ctx.session.startTime + duration) <= songDuration && ctx.session.startTime <= songDuration) {
-                        const oggFilePath = path.join(__dirname, '../userdata', `${telegramId}`, `${currentAudioFileId}.ogg`);
+                        const oggFilePath = path.join(__dirname, '../../../userdata', `${telegramId}`, `${currentAudioFileId}.ogg`);
 
                         if (!fs.existsSync(oggFilePath)) {
                             console.log(`Trimming audio with duration: ${duration}`.debug);
