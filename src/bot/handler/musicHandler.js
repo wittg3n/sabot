@@ -1,13 +1,11 @@
 const { convertToOgg, getAudioDuration } = require('../utils/converter');
 const { downloadFile } = require('../utils/downloader');
 const path = require('path');
-const colors = require('../colors.config');
+const colors = require('../../../config/colors.config');
 const fs = require('fs')
 module.exports = {
     musicToVoice: (bot) => {
         let currentAudioFileId = null;
-
-
         const startTimeOptions = [
             [{ text: '0', callback_data: 'start_time_0' }],
             [{ text: '00:30', callback_data: 'start_time_30' }],
@@ -88,7 +86,7 @@ module.exports = {
                         console.log(`Invalid duration selection. Song duration: ${songDuration}, Selected: ${ctx.session.startTime + duration}`.err);
                         await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'The selected start time and duration exceed the length of the audio file. Please choose a different duration:', {
                             reply_markup: {
-                                inline_keyboard: durationOptions
+                                inline_keyboard: startTimeOptions
                             }
                         });
                     }

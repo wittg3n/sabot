@@ -1,14 +1,19 @@
 {
   "name": "sabot",
   "version": "1.0.0",
-  "main": "bot.js",
+  "main": "src/bot/bot.js",
   "scripts": {
-    "dev": "concurrently \"nodemon bot.js\" \"nodemon server/index.js\""
+    "start": "node src/server/server.js",
+    "bot": "node src/bot/bot.js",
+    "dev-bot": "nodemon src/bot/bot.js",
+    "dev-server": "nodemon src/server/server.js",
+    "redis": "start /B redis-server --loglevel verbose > redis.log 2>&1 && echo Redis server is launched",
+    "dev": "concurrently \"npm run dev-server\" \"npm run dev-bot\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "A Telegram bot that interacts with users.",
   "dependencies": {
     "@telegraf/session": "^2.0.0-beta.7",
     "axios": "^1.7.7",
@@ -20,10 +25,10 @@
     "form-data": "^4.0.0",
     "mongoose": "^8.6.3",
     "redis": "^4.7.0",
-    "telegraf": "^4.16.3"
+    "telegraf": "^4.16.3",
+    "winston": "^3.14.2"
   },
   "devDependencies": {
-    "colors": "^1.4.0",
     "concurrently": "^9.0.1",
     "nodemon": "^3.1.7"
   }

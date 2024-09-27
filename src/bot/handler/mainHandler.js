@@ -2,7 +2,7 @@ const axios = require('axios');
 const fs = require('fs')
 const path = require('path');
 const { downloadFile } = require('../utils/downloader');
-const responses = require('../responses')
+const responses = require('../../../responses')
 module.exports = {
     start: (bot) => {
         bot.start((ctx) => {
@@ -26,10 +26,8 @@ module.exports = {
     },
 
     launch: (bot) => {
+        console.log('Attempting to launch bot...'.bgBlue);
         bot.launch()
-            .then(() => {
-                console.log('Bot is running...');
-            })
             .catch(error => {
                 console.error('Error launching bot:', error.message);
             });
@@ -50,14 +48,17 @@ module.exports = {
             }
 
             const audioFileId = ctx.message.audio.file_id;
+            console.log(ctx.message.audio.file_name)
             const telegramId = ctx.from.id;
             try {
-                const expectedAudioFilePath = path.join(__dirname, '../userdata', String(telegramId), `${audioFileId}.mp3`);
+                const expectedAudioFilePath = path.join(__dirname, '../../../userdata', String(telegramId), `${audioFileId}.mp3`);
                 if (!ctx.session.audioFileId) {
                     ctx.session.audioFileId = audioFileId;
                 }
                 if (!fs.existsSync(expectedAudioFilePath)) {
-                    ctx.reply(responses.downloading)
+                    const sentMessage = await ctx.reply(responses.downloading);
+                    ctx.session.messageToDelete = sentMessage.message_id; 
+
                     const audioFilePath = await downloadFile(audioFileId, telegramId);
                     console.log(audioFilePath);
                     ctx.session.audioFilePath = audioFilePath;
@@ -65,13 +66,17 @@ module.exports = {
                     console.log('Audio file already exists, using existing file.');
                     ctx.session.audioFilePath = expectedAudioFilePath;
                 }
+                if (ctx.session.messageToDelete) {
+                    await ctx.deleteMessage(ctx.session.messageToDelete);
+                    ctx.session.messageToDelete = null; 
+                }
                 const message = await ctx.replyWithAudio(
                     ctx.session.audioFileId,
                     {
                         reply_markup: {
                             inline_keyboard: [
-                                [{ text: '📝 Change Caption', callback_data: 'change_caption' }],
-                                [{ text: '🎤 Create Voice', callback_data: 'create_voice' }]
+                                [{ text:responses.changeCaption, callback_data: 'change_caption' }],
+                                [{ text: responses.musicToVoice, callback_data: 'create_voice' }]
                             ]
                         }
                     }
@@ -81,7 +86,7 @@ module.exports = {
                 ctx.session.chatId = ctx.chat.id;
             } catch (error) {
                 console.error('Error handling audio:', error.message);
-                await ctx.reply('Failed to process audio.');
+                await ctx.reply(responses.failedToProcessAudio);
             }
         });
     },

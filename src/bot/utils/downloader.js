@@ -15,7 +15,7 @@ const downloadFile = async (fileId, telegramId) => {
 
         const response = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
 
-        const outputDir = path.join(__dirname, '../userdata', String(telegramId));
+        const outputDir = path.join(__dirname, '../../../userdata', String(telegramId));
 
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
