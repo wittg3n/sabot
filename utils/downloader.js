@@ -13,22 +13,17 @@ const downloadFile = async (fileId, telegramId) => {
         const filePath = fileResponse.data.result.file_path;
         const downloadUrl = `https://api.telegram.org/file/bot${process.env.TOKEN}/${filePath}`;
 
-        // Step 2: Download the file
         const response = await axios.get(downloadUrl, { responseType: 'arraybuffer' });
 
-        // Step 3: Create the output directory if it doesn't exist
         const outputDir = path.join(__dirname, '../userdata', String(telegramId));
-        
-        // Ensure the output directory exists
+
         if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true }); // Create directory recursively
+            fs.mkdirSync(outputDir, { recursive: true });
             console.log(`Directory created: ${outputDir}`);
         }
 
-        // Step 4: Define the output file path
         const fileOutputPath = path.join(outputDir, `${fileId}.mp3`);
 
-        // Step 5: Write the file to disk
         fs.writeFileSync(fileOutputPath, response.data);
         console.log(`File successfully downloaded: ${fileOutputPath}`);
         return fileOutputPath;

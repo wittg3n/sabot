@@ -5,9 +5,9 @@ const colors = require('../colors.config');
 const fs = require('fs')
 module.exports = {
     musicToVoice: (bot) => {
-        let currentAudioFileId = null; // Store the audio file ID for processing later
+        let currentAudioFileId = null;
 
-        // Inline keyboard for start time options
+
         const startTimeOptions = [
             [{ text: '0', callback_data: 'start_time_0' }],
             [{ text: '00:30', callback_data: 'start_time_30' }],
@@ -15,7 +15,7 @@ module.exports = {
             [{ text: '01:30', callback_data: 'start_time_90' }]
         ];
 
-        // Inline keyboard for duration options
+
         const durationOptions = [
             [{ text: '00:30', callback_data: 'duration_30' }],
             [{ text: '01:00', callback_data: 'duration_60' }],
@@ -24,7 +24,6 @@ module.exports = {
         ];
 
         bot.on('callback_query', async (ctx) => {
-            // Ensure session is initialized
             if (!ctx.session) {
                 ctx.session = {};
             }
@@ -35,22 +34,22 @@ module.exports = {
 
             try {
                 if (callbackData === 'create_voice') {
-                    currentAudioFileId = ctx.callbackQuery.message.audio.file_id; // Store the audio file ID
+                    currentAudioFileId = ctx.callbackQuery.message.audio.file_id;
 
-                    // Prompt user to select start time with inline keyboard
+
                     const promptMessage = await ctx.reply('Please select the start time:', {
                         reply_markup: {
                             inline_keyboard: startTimeOptions
                         }
                     });
 
-                    ctx.session.promptMessageId = promptMessage.message_id; // Store the prompt message ID
+                    ctx.session.promptMessageId = promptMessage.message_id;
                 } else if (callbackData.startsWith('start_time_')) {
-                    const startTime = Number(callbackData.split('_')[2]); // Extract start time in seconds
+                    const startTime = Number(callbackData.split('_')[2]);
                     console.log(`Selected start time: ${startTime}`.debug);
-                    ctx.session.startTime = startTime; // Store start time in session
+                    ctx.session.startTime = startTime;
 
-                    // Edit prompt message to choose duration
+
                     await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'You selected the start time. Now, please choose a duration:', {
                         reply_markup: {
                             inline_keyboard: durationOptions
@@ -61,7 +60,7 @@ module.exports = {
                     const duration = Number(callbackData.split('_')[1]);
                     const telegramId = ctx.from.id;
 
-                    // Use the audio file path from the session
+
                     const audioFilePath = ctx.session.audioFilePath;
                     if (!audioFilePath) {
                         throw new Error('Audio file path not found in session.');
@@ -72,7 +71,6 @@ module.exports = {
                     if ((ctx.session.startTime + duration) <= songDuration && ctx.session.startTime <= songDuration) {
                         const oggFilePath = path.join(__dirname, '../userdata', `${telegramId}`, `${currentAudioFileId}.ogg`);
 
-                        // Check if the .ogg file already exists
                         if (!fs.existsSync(oggFilePath)) {
                             console.log(`Trimming audio with duration: ${duration}`.debug);
                             await convertToOgg(audioFilePath, oggFilePath, ctx.session.startTime, duration);
@@ -82,10 +80,8 @@ module.exports = {
 
                         await ctx.replyWithVoice({ source: oggFilePath });
 
-                        // Edit the prompt message to inform the user that the voice message has been sent
                         await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'Your trimmed voice message has been sent!');
 
-                        // Clear session data for the next request
                         currentAudioFileId = null;
                         ctx.session.startTime = null;
                     } else {

@@ -3,29 +3,29 @@ const mongoose = require('mongoose');
 const postSchema = new mongoose.Schema({
     telegramId: {
         type: String,
-        required: true, // Ensure telegramId is required
+        required: true,
     },
     musicFileId: {
         type: String,
-        required: true, // Store the music file ID
+        required: true,
     },
     caption: {
         type: String,
-        required: true, // Caption of the post
+        required: true,
     },
     voiceFileId: {
         type: String,
-        required: true, // Store the voice file ID
+        required: true,
     },
     imageFileId: {
         type: String,
-        required: true, // Store the image file ID
+        required: true,
     },
     dateSent: {
         type: Date,
-        default: Date.now, // Automatically set to current date
+        default: Date.now,
     },
-    createdAt:{
+    createdAt: {
         type: Date,
         default: Date.now
     }

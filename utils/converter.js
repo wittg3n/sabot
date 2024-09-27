@@ -1,6 +1,6 @@
-const fs = require('fs'); // Import the fs module
+const fs = require('fs');
 const ffmpeg = require('fluent-ffmpeg');
-const path = require('path'); // Import the path module
+const path = require('path');
 
 const getAudioDuration = (filePath) => {
     return new Promise((resolve, reject) => {
@@ -8,7 +8,7 @@ const getAudioDuration = (filePath) => {
             if (err) {
                 return reject(err);
             }
-            const duration = metadata.format.duration; // Duration in seconds
+            const duration = metadata.format.duration;
             resolve(duration);
         });
     });
@@ -21,7 +21,6 @@ const convertToOgg = async (inputFile, outputFile, startTime, duration) => {
 
     const outputDir = path.dirname(outputFile);
     await fs.promises.mkdir(outputDir, { recursive: true });
-
 
     return new Promise((resolve, reject) => {
         ffmpeg(inputFile)
@@ -44,4 +43,3 @@ const convertToOgg = async (inputFile, outputFile, startTime, duration) => {
 };
 
 module.exports = { convertToOgg, getAudioDuration };
-//TODO where is ogg file for fuck sake?
