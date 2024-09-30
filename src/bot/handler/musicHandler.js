@@ -1,26 +1,12 @@
 const { convertToOgg, getAudioDuration } = require('../utils/converter');
 const { downloadFile } = require('../utils/downloader');
+const query = require('../../../config/inlineQueries')
 const path = require('path');
-const colors = require('../../../config/colors.config');
 const fs = require('fs')
 module.exports = {
     musicToVoice: (bot) => {
         let currentAudioFileId = null;
-        const startTimeOptions = [
-            [{ text: '0', callback_data: 'start_time_0' }],
-            [{ text: '00:30', callback_data: 'start_time_30' }],
-            [{ text: '01:00', callback_data: 'start_time_60' }],
-            [{ text: '01:30', callback_data: 'start_time_90' }]
-        ];
-
-
-        const durationOptions = [
-            [{ text: '00:30', callback_data: 'duration_30' }],
-            [{ text: '01:00', callback_data: 'duration_60' }],
-            [{ text: '01:30', callback_data: 'duration_90' }],
-            [{ text: '02:00', callback_data: 'duration_120' }]
-        ];
-
+     
         bot.on('callback_query', async (ctx) => {
             if (!ctx.session) {
                 ctx.session = {};
@@ -37,7 +23,7 @@ module.exports = {
 
                     const promptMessage = await ctx.reply('Please select the start time:', {
                         reply_markup: {
-                            inline_keyboard: startTimeOptions
+                            inline_keyboard: query.startTimeOptions
                         }
                     });
 
@@ -50,7 +36,7 @@ module.exports = {
 
                     await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'You selected the start time. Now, please choose a duration:', {
                         reply_markup: {
-                            inline_keyboard: durationOptions
+                            inline_keyboard: query.durationOptions
                         }
                     });
                 } else if (callbackData.startsWith('duration_')) {
@@ -86,7 +72,7 @@ module.exports = {
                         console.log(`Invalid duration selection. Song duration: ${songDuration}, Selected: ${ctx.session.startTime + duration}`.err);
                         await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'The selected start time and duration exceed the length of the audio file. Please choose a different duration:', {
                             reply_markup: {
-                                inline_keyboard: startTimeOptions
+                                inline_keyboard: query.startTimeOptions
                             }
                         });
                     }

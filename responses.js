@@ -22,5 +22,8 @@ module.exports = {
 
 
     changeCaption: '📝 تغییر تگ فایل mp3',
-    musicToVoice: '🎤 تبدیل فایل mp3 به ویس'
+    musicToVoice: '🎤 تبدیل فایل mp3 به ویس',
+    server: {
+        error: 'مشکلی پیش آمده'
+    }
 };
