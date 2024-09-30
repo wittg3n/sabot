@@ -1,7 +1,7 @@
 const User = require('../database/models/User');
 const router = require('express').Router();
-const logger = require('../../../config/logger')
-const responses = require('../../../config/responses');
+const logger = require('../../config/logger')
+const responses = require('../../config/responses');
 router.post('/create', async (req, res) => {
     try {
         const { username, telegramId } = req.body;

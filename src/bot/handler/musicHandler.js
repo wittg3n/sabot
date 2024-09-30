@@ -1,6 +1,6 @@
 const { convertToOgg, getAudioDuration } = require('../utils/converter');
 const { downloadFile } = require('../utils/downloader');
-const query = require('../../../config/inlineQueries');
+const query = require('../../config/inlineQueries');
 const path = require('path');
 const fs = require('fs');
 const { default: axios } = require('axios');

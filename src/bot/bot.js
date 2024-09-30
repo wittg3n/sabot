@@ -1,6 +1,6 @@
 require('dotenv').config();
 const { Telegraf, session } = require('telegraf');
-const store = require("../../config/redis.config");
+const store = require("../config/redis.config");
 const bot = new Telegraf(process.env.TOKEN);
 bot.use(session({ store }));
 

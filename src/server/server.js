@@ -34,7 +34,7 @@ process.on('SIGINT', async() => {
     await mongoose.connection.close()
     process.exit(0);
 });
-const color = require('../../config/colors.config');
+const color = require('../config/colors.config');
 const { default: mongoose } = require('mongoose');
 app.listen(port, () => {
     console.log('back-end is running...'.bgGreen)

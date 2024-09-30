@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const colors = require('../../../config/colors.config')
+const colors = require('../../config/colors.config')
 const connectDB = async () => {
     try {
         await mongoose.connect('mongodb://localhost:27017/sabot');
