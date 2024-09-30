@@ -9,11 +9,12 @@ const userSchema = new mongoose.Schema({
         unique: true
     },
     channels: [{
-        type: String
+        id: { type: String, required: true },
+        name: { type: String, required: true }
     }],
     post: [{
         type: String,
-        required: true 
+        required: true
     }],
     status: {
         type: String,

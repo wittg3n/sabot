@@ -14,5 +14,9 @@ module.exports = {
             { text: '01:30', callback_data: 'duration_90' },
             { text: '02:00', callback_data: 'duration_120' }
         ]
+    ],
+    publishToChannel:[
+        [{ text: 'بله', callback_data: 'publish_to_channel' }],
+        [{ text: 'خیر', callback_data: 'no_publish' }]
     ]
 };
