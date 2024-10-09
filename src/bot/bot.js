@@ -8,36 +8,7 @@ const { musicToVoice } = require('./handler/musicHandler');
 const { menu, stop, start, launch } = require('./handler/mainHandler');
 
 
-const COMMAND_LIMIT = 10;  
-const TIME_WINDOW = 60;    
 
-async function rateLimiter(ctx, next) {
-    const userId = ctx.from.id;
-    const currentTime = Math.floor(Date.now() / 1000); 
-
-    const redisKey = `command_count:${userId}`;
-
-    try {
-        const commandTimes = await store.lrangeAsync(redisKey, 0, -1);
-
-        const recentCommands = commandTimes.filter(timestamp => currentTime - timestamp <= TIME_WINDOW);
-
-        if (recentCommands.length >= COMMAND_LIMIT) {
-            return ctx.reply('شما بیش از حد مجاز از دستورات استفاده کرده‌اید. لطفاً یک دقیقه دیگر صبر کنید.');
-        }
-
-        await store.rpushAsync(redisKey, currentTime);
-
-        await store.expire(redisKey, TIME_WINDOW);
-
-        return next();
-    } catch (error) {
-        console.error('خطا در محدودیت دستورات:', error);
-        return ctx.reply('مشکلی رخ داده است. لطفاً بعداً تلاش کنید.');
-    }
-}
-
-bot.use(rateLimiter);
 
 start(bot);
 menu(bot);

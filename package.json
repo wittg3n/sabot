@@ -9,7 +9,7 @@
     "dev-server": "nodemon src/server/server.js",
     "redis-windows": "start /B redis-server --loglevel verbose > redis.log 2>&1 && echo Redis server is launched",
     "redis-linux": "redis-server --loglevel verbose > redis.log 2>&1 && echo Redis server is launched",
-    "dev": "concurrently \"npm run redis\" \"npm run dev-server\" \"npm run dev-bot\"",
+    "dev": "concurrently  \"npm run dev-server\" \"npm run dev-bot\"",
     "deploy": "concurrently \"npm run redis\" \"npm run server\" \"npm run bot\"",
     "redis": "cross-env IS_WINDOWS=true npm run redis-windows || npm run redis-linux"
   },

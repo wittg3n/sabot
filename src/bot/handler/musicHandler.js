@@ -5,6 +5,33 @@ const path = require('path');
 const fs = require('fs');
 const { default: axios } = require('axios');
 
+function sanitizeChannelLink(link) {
+    const validTelegramURL = /(?:https?:\/\/)?(?:t\.me\/|telegram\.me\/)([\w\d_]+)/;
+    const match = link.match(validTelegramURL);
+    return match ? match[0] : null;
+}
+
+function extractChannelId(link) {
+    const regex = /(?:https?:\/\/)?(?:t\.me\/|telegram\.me\/)(\w+)/;
+    const match = link.match(regex);
+    return match ? match[1] : null;
+}
+
+function extractChannelName(channelLink) {
+    const urlParts = channelLink.split('/');
+    return urlParts[urlParts.length - 1];
+}
+
+async function getChannelName(bot, channelId) {
+    try {
+        const chat = await bot.telegram.getChat(`@${channelId}`);
+        return chat.title; // This will return the actual name of the channel
+    } catch (error) {
+        console.error('Error fetching channel name:', error.message);
+        throw new Error('Unable to retrieve the channel name from Telegram.');
+    }
+}
+
 module.exports = {
     musicToVoice: (bot) => {
         let currentAudioFileId = null;
@@ -15,7 +42,6 @@ module.exports = {
             }
 
             const callbackData = ctx.callbackQuery.data;
-            const messageId = ctx.session.messageId;
             const chatId = ctx.session.chatId;
 
             try {
@@ -29,6 +55,7 @@ module.exports = {
                     });
 
                     ctx.session.promptMessageId = promptMessage.message_id;
+
                 } else if (callbackData.startsWith('start_time_')) {
                     const startTime = Number(callbackData.split('_')[2]);
                     ctx.session.startTime = startTime;
@@ -38,6 +65,7 @@ module.exports = {
                             inline_keyboard: query.durationOptions
                         }
                     });
+
                 } else if (callbackData.startsWith('duration_')) {
                     const duration = Number(callbackData.split('_')[1]);
                     const telegramId = ctx.from.id;
@@ -51,25 +79,54 @@ module.exports = {
 
                     if ((ctx.session.startTime + duration) <= songDuration && ctx.session.startTime <= songDuration) {
                         const oggFilePath = path.join(__dirname, '../../../userdata', `${telegramId}`, `${currentAudioFileId}.ogg`);
+                        ctx.session.oggFilePath = oggFilePath;
 
                         if (!fs.existsSync(oggFilePath)) {
                             await convertToOgg(audioFilePath, oggFilePath, ctx.session.startTime, duration);
                         }
 
-                        // ارسال ویس به کاربر
                         await ctx.replyWithVoice({ source: oggFilePath });
 
-                        // پرسش از کاربر برای ارسال به کانال
-                        const channelPrompt = await ctx.reply('آیا می‌خواهید این ویس را به کانال ارسال کنید؟', {
+                        const channelPrompt = await ctx.reply('کانال مورد نظر را انتخاب کنید:', {
                             reply_markup: {
                                 inline_keyboard: [
-                                    [{ text: 'بله', callback_data: 'publish_to_channel' }],
-                                    [{ text: 'خیر', callback_data: 'no_publish' }]
+                                    [{ text: 'در حال بارگذاری کانال‌ها...', callback_data: 'loading_channels' }] 
                                 ]
                             }
                         });
 
                         ctx.session.channelPromptMessageId = channelPrompt.message_id;
+
+                        try {
+                            const response = await axios.get(`http://localhost:3001/user/get_all_channels/${telegramId}`);
+                            const channels = response.data.channels;
+                            const msg = response.data.message;
+                            console.log(msg);
+                            if (channels && channels.length > 0) {
+                                const inlineKeyboard = channels.map(channel => [
+                                    { text: channel.name, callback_data: `sendtochannel.${channel.id}` }
+                                ]);
+
+                                inlineKeyboard.push([{ text: 'اضافه کردن کانال جدید', callback_data: 'add_new_channel' }]); 
+
+                                await ctx.telegram.editMessageText(chatId, ctx.session.channelPromptMessageId, undefined, 'کانال مورد نظر را انتخاب کنید:', {
+                                    reply_markup: {
+                                        inline_keyboard: inlineKeyboard
+                                    }
+                                });
+                            } else {
+                                await ctx.telegram.editMessageText(chatId, ctx.session.channelPromptMessageId, undefined, 'هیچ کانالی یافت نشد. لطفاً یک کانال جدید اضافه کنید:', {
+                                    reply_markup: {
+                                        inline_keyboard: [
+                                            [{ text: 'اضافه کردن کانال جدید', callback_data: 'add_new_channel' }]
+                                        ]
+                                    }
+                                });
+                            }
+                        } catch (apiError) {
+                            console.error('API Error:', apiError.message);
+                            await ctx.telegram.editMessageText(chatId, ctx.session.channelPromptMessageId, undefined, 'خطایی در دریافت کانال‌ها رخ داد. لطفاً دوباره امتحان کنید.');
+                        }
 
                         currentAudioFileId = null;
                         ctx.session.startTime = null;
@@ -80,43 +137,94 @@ module.exports = {
                             }
                         });
                     }
-                } else if (callbackData === 'publish_to_channel') {
+                } else if (callbackData.startsWith('sendtochannel.')) {
+                    const channel = callbackData.split('.')[1];
+                    const selectedChannelId = channel.startsWith('-100') ? channel : '@' + channel;
                     
-                    const userChannelId = axios.get(`http://localhost:3001/user/get_all_channles/${ctx.from.id}`) // تابعی که شما باید برای دریافت آیدی کانال از دیتابیس بنویسید
+                    
+                    console.log('Attempting to send voice to channel:', selectedChannelId); // Log channel ID
 
-                    if (!userChannelId) {
-                        await ctx.reply('لطفاً آیدی کانال خود را بفرستید:');
-                        ctx.session.awaitingChannelId = true; // نشان دادن اینکه در حال انتظار آیدی کانال هستیم
-                    } else {
-                        // ارسال ویس به کانال
-                        await ctx.telegram.sendVoice(userChannelId, { source: oggFilePath });
-                        await ctx.reply(`ویس به کانال ${userChannelId} ارسال شد.`);
-                    }
-                } else if (ctx.session.awaitingChannelId) {
-                    const channelId = ctx.message.text; 
-                    const response = await axios.get('http://localhost:3000/add_channel', {
-                        params: {
-                            telegramId,
-                            channelId,
-                            channelName
+                    try {
+                        // Attempt to send the voice message to the selected channel
+                        await ctx.telegram.sendVoice(selectedChannelId, { source: ctx.session.oggFilePath });
+                        ctx.session.oggFilePath = false;
+                        await ctx.reply(`ویس به کانال ${selectedChannelId} ارسال شد.`);
+                    } catch (error) {
+                        console.error('Error sending voice to channel:', error.message);
+                        await ctx.reply('خطایی در ارسال صدا به کانال رخ داد. لطفاً دوباره امتحان کنید.');
+
+                        // Check if the error is due to the chat not being found
+                        if (error.response && error.response.status === 400) {
+                            await ctx.reply('کانال پیدا نشد. لطفاً مطمئن شوید که لینک کانال صحیح است و ربات به آن دسترسی دارد.');
                         }
-                    });
-                    if(response){
-                        ctx.reply(`آیدی کانال شما با موفقیت ذخیره شد: ${channelId}`);
-                        ctx.session.awaitingChannelId = false; 
                     }
-                    else{
-                        ctx.reply('مشکلی در ذخیره کانال پیش آمده.',{
-                            reply_markup:{
-                                inline_keyboard: query.publishToChannel 
-                            }
-                        })
-                    }
-
+                } else if (callbackData === 'add_new_channel') {
+                    await ctx.reply('لطفاً لینک کانال جدید را وارد کنید:');
+                    ctx.session.awaitingChannelLink = true; 
                 }
+
             } catch (error) {
                 console.error('Error processing request:', error.message);
-                await ctx.reply('There was an error while trying to update your request. Please try again.');
+                await ctx.reply('There was an error while processing your request. Please try again.');
+            }
+        });
+
+        bot.on('text', async (ctx) => {
+            if (ctx.session.awaitingChannelLink) {
+                const channelLink = ctx.message.text;
+                const sanitizedLink = sanitizeChannelLink(channelLink);
+        
+                if (!sanitizedLink) {
+                    await ctx.reply('لینک نامعتبر است. لطفاً یک لینک معتبر از تلگرام وارد کنید.');
+                    return;
+                }
+        
+                const telegramId = ctx.from.id;
+                const channelId = extractChannelId(sanitizedLink);
+        
+                try {
+                    const channelName = await getChannelName(bot, channelId); 
+        
+                    // Add the new channel to the user's list
+                    await axios.get('http://localhost:3001/user/add_channel', {
+                        params: { telegramId, channelId, channelName }
+                    });
+        
+                    await ctx.reply(`کانال ${channelName} با موفقیت اضافه شد.`);
+        
+                    // Fetch the updated list of channels, including the newly added one
+                    const response = await axios.get(`http://localhost:3001/user/get_all_channels/${telegramId}`);
+                    const channels = response.data.channels;
+        
+                    if (channels.length > 0) {
+                        const inlineKeyboard = channels.map(channel => [
+                            { text: channel.name, callback_data: `sendtochannel.${channel.id}` }
+                        ]);
+        
+                        inlineKeyboard.push([{ text: 'اضافه کردن کانال جدید', callback_data: 'add_new_channel' }]);
+        
+                        // Display the updated list of channels, including the newly added one
+                        await ctx.reply('کانال‌های شما:', {
+                            reply_markup: {
+                                inline_keyboard: inlineKeyboard
+                            }
+                        });
+                    } else {
+                        await ctx.reply('هیچ کانالی یافت نشد. لطفاً یک کانال جدید اضافه کنید.', {
+                            reply_markup: {
+                                inline_keyboard: [
+                                    [{ text: 'اضافه کردن کانال جدید', callback_data: 'add_new_channel' }]
+                                ]
+                            }
+                        });
+                    }
+        
+                } catch (error) {
+                    console.error('Error adding channel:', error.message);
+                    await ctx.reply('خطایی در افزودن کانال رخ داد. لطفاً دوباره امتحان کنید.');
+                }
+        
+                ctx.session.awaitingChannelLink = false;
             }
         });
     }

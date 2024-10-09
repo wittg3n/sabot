@@ -10,7 +10,7 @@ const userSchema = new mongoose.Schema({
     },
     channels: [{
         id: { type: String, required: true },
-        name: { type: String, required: true }
+        name: { type: String}
     }],
     post: [{
         type: String,

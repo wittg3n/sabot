@@ -34,19 +34,21 @@ router.post('/create', [
     }
 });
 
-router.get('/get_all_channles', [
-    query('telegramId').isInt().withMessage('آیدی تلگرام معتبر نیست')
+router.get('/get_all_channels/:telegramId', [
+    param('telegramId').isString().withMessage('آیدی تلگرام معتبر نیست') // Use param to validate the URL parameter
 ], async (req, res) => {
-    const errors = validationResult(req);
+    const errors = validationResult(req); // Check for validation errors
     if (!errors.isEmpty()) {
+        console.log(`happens on get_all_channels`)
         return res.status(400).json({ errors: errors.array() });
     }
-
-    const telegramId = req.query.telegramId;
+    const telegramId = req.params.telegramId; // Use req.params to get the parameter from the URL
+    
     try {
         const user = await User.findOne({ telegramId });
         if (!user || !user.channels.length) {
-            return res.status(404).json({ message: 'کانالی یافت نشد' });
+            console.log('in get all channels')
+            return res.status(200).json({ message: 'کانالی یافت نشد' });
         }
 
         res.status(200).json({ channels: user.channels });
@@ -56,12 +58,13 @@ router.get('/get_all_channles', [
 });
 
 router.get('/add_channel', [
-    query('telegramId').isInt().withMessage('آیدی تلگرام معتبر نیست'),
+    query('telegramId').isString().withMessage('آیدی تلگرام معتبر نیست'),
     query('channelId').isString().withMessage('آیدی کانال معتبر نیست'),
     query('channelName').isString().withMessage('نام کانال معتبر نیست')
 ], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+        console.log(errors.array())
         return res.status(400).json({ errors: errors.array() });
     }
 
@@ -85,9 +88,9 @@ router.get('/add_channel', [
 
         res.status(200).json({ message: 'کانال با موفقیت اضافه شد', channels: user.channels });
     } catch (error) {
-        console.error('Error adding channel:', error);
         res.status(500).json({ message: 'خطا در افزودن کانال' });
     }
 });
+
 
 module.exports = router;
