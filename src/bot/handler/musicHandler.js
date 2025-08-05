@@ -48,7 +48,7 @@ module.exports = {
                 if (callbackData === 'create_voice') {
                     currentAudioFileId = ctx.callbackQuery.message.audio.file_id;
 
-                    const promptMessage = await ctx.reply('Please select the start time:', {
+                    const promptMessage = await ctx.reply('لظفا زمان شروع را انتخاب کنید', {
                         reply_markup: {
                             inline_keyboard: query.startTimeOptions
                         }
@@ -60,7 +60,7 @@ module.exports = {
                     const startTime = Number(callbackData.split('_')[2]);
                     ctx.session.startTime = startTime;
 
-                    await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'You selected the start time. Now, please choose a duration:', {
+                    await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'حالا مدت زمان ویس را انتخاب کنید', {
                         reply_markup: {
                             inline_keyboard: query.durationOptions
                         }
@@ -131,7 +131,7 @@ module.exports = {
                         currentAudioFileId = null;
                         ctx.session.startTime = null;
                     } else {
-                        await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'The selected start time and duration exceed the length of the audio file. Please choose a different duration:', {
+                        await ctx.telegram.editMessageText(chatId, ctx.session.promptMessageId, undefined, 'آغاز و پایانی که انتخاب کردید صحیح نیست. لطفا دوباره انتخاب کنید:', {
                             reply_markup: {
                                 inline_keyboard: query.startTimeOptions
                             }
@@ -165,7 +165,7 @@ module.exports = {
 
             } catch (error) {
                 console.error('Error processing request:', error.message);
-                await ctx.reply('There was an error while processing your request. Please try again.');
+                await ctx.reply('مشکلی ئیش آمده دوباره امتحان کنید ');
             }
         });
 
