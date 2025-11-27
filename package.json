@@ -1,0 +1,15 @@
+{
+  "name": "kiagram",
+  "version": "1.0.0",
+  "description": "a telegram bot which post in channel",
+  "keywords": [
+    "telegram-bot"
+  ],
+  "license": "ISC",
+  "author": "wittg3n",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js"
+  }
+}
