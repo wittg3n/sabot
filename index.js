@@ -16,6 +16,7 @@ if (!CHANNEL_ID) {
 
 const bot = new Telegraf(BOT_TOKEN);
 const chunks = {};
+const scheduledChunks = [];
 
 function resetChunk(chatId) {
   delete chunks[chatId];
@@ -44,6 +45,20 @@ function addVoiceToChunk(chatId, voice, caption) {
   console.log(`Chunk completed for chat ${chatId}`);
 }
 
+async function sendChunkToChannel(chunk) {
+  await bot.telegram.sendPhoto(CHANNEL_ID, chunk.photo.fileId, {
+    caption: chunk.photo.caption,
+  });
+
+  await bot.telegram.sendAudio(CHANNEL_ID, chunk.audio.fileId, {
+    caption: chunk.audio.caption,
+  });
+
+  await bot.telegram.sendVoice(CHANNEL_ID, chunk.voice.fileId, {
+    caption: chunk.voice.caption || undefined,
+  });
+}
+
 async function postChunkToChannel(chatId, ctx) {
   const chunk = chunks[chatId];
   if (!chunk || chunk.step !== 3) {
@@ -54,17 +69,7 @@ async function postChunkToChannel(chatId, ctx) {
   }
 
   try {
-    await bot.telegram.sendPhoto(CHANNEL_ID, chunk.photo.fileId, {
-      caption: chunk.photo.caption,
-    });
-
-    await bot.telegram.sendAudio(CHANNEL_ID, chunk.audio.fileId, {
-      caption: chunk.audio.caption,
-    });
-
-    await bot.telegram.sendVoice(CHANNEL_ID, chunk.voice.fileId, {
-      caption: chunk.voice.caption || undefined,
-    });
+    await sendChunkToChannel(chunk);
 
     console.log(`Chunk posted for chat ${chatId}`);
     resetChunk(chatId);
@@ -72,6 +77,64 @@ async function postChunkToChannel(chatId, ctx) {
   } catch (error) {
     console.error("Failed to post chunk", error);
     await ctx.reply("Failed to post to channel. Please try again.");
+  }
+}
+
+function parseScheduleInput(input) {
+  if (!input) {
+    return null;
+  }
+
+  const [datePart, timePart = "00:00"] = input.trim().split(/\s+/);
+  const [day, month, year] = (datePart || "").split("/").map(Number);
+  const [hour, minute = 0] = (timePart || "").split(":").map(Number);
+
+  if (!day || !month || !year || Number.isNaN(hour) || Number.isNaN(minute)) {
+    return null;
+  }
+
+  const scheduledAt = new Date(year, month - 1, day, hour, minute);
+
+  if (Number.isNaN(scheduledAt.getTime())) {
+    return null;
+  }
+
+  return scheduledAt;
+}
+
+function scheduleChunkForRelease(chatId, chunk, scheduledAt, ctx) {
+  scheduledChunks.push({ chatId, chunk, scheduledAt });
+  resetChunk(chatId);
+  ctx.reply(`Chunk scheduled for ${scheduledAt.toLocaleString()}.`);
+  console.log(
+    `Chunk scheduled for chat ${chatId} at ${scheduledAt.toISOString()}`
+  );
+}
+
+async function postDueScheduledChunks() {
+  const now = new Date();
+
+  for (let i = scheduledChunks.length - 1; i >= 0; i -= 1) {
+    const scheduled = scheduledChunks[i];
+
+    if (scheduled.scheduledAt <= now) {
+      scheduledChunks.splice(i, 1);
+
+      try {
+        await sendChunkToChannel(scheduled.chunk);
+        console.log(`Scheduled chunk posted for chat ${scheduled.chatId}`);
+        await bot.telegram.sendMessage(
+          scheduled.chatId,
+          `Scheduled chunk posted to channel at ${new Date().toLocaleString()}.`
+        );
+      } catch (error) {
+        console.error("Failed to post scheduled chunk", error);
+        await bot.telegram.sendMessage(
+          scheduled.chatId,
+          "Failed to post your scheduled chunk. Please try scheduling again."
+        );
+      }
+    }
   }
 }
 
@@ -84,7 +147,7 @@ function sendOrderError(ctx) {
 
 bot.start((ctx) => {
   ctx.reply(
-    "Send a photo with caption, then an audio with caption, then a voice message. Use /post to publish the completed chunk or /cancel to discard it."
+    "Send a photo with caption, then an audio with caption, then a voice message. Use /post to publish immediately, /schedule <DD/MM/YYYY HH:MM> to schedule, or /cancel to discard the current chunk."
   );
 });
 
@@ -94,6 +157,33 @@ bot.command("cancel", (ctx) => {
 });
 
 bot.command("post", (ctx) => postChunkToChannel(ctx.chat.id, ctx));
+
+bot.command("schedule", (ctx) => {
+  const chatId = ctx.chat.id;
+  const chunk = chunks[chatId];
+
+  if (!chunk || chunk.step !== 3) {
+    return ctx.reply(
+      "No complete chunk to schedule. Please send photo, audio, and voice in order."
+    );
+  }
+
+  const scheduleInput = ctx.message.text.replace("/schedule", "").trim();
+  const scheduledAt = parseScheduleInput(scheduleInput);
+
+  if (!scheduledAt) {
+    return ctx.reply(
+      "Please provide a valid date/time in the format DD/MM/YYYY HH:MM (time is optional). Example: 17/02/2025 09:30"
+    );
+  }
+
+  if (scheduledAt <= new Date()) {
+    return ctx.reply("Scheduled time must be in the future.");
+  }
+
+  scheduleChunkForRelease(chatId, chunk, scheduledAt, ctx);
+  return null;
+});
 
 bot.on("photo", (ctx) => {
   const chatId = ctx.chat.id;
@@ -131,7 +221,7 @@ bot.on("voice", (ctx) => {
 
   addVoiceToChunk(chatId, ctx.message.voice, ctx.message.caption);
   ctx.reply(
-    "Chunk ready. Send /post to publish to the channel or /cancel to discard."
+    "Chunk ready. Send /post to publish to the channel, /schedule <DD/MM/YYYY HH:MM> to delay posting, or /cancel to discard."
   );
 });
 
@@ -144,6 +234,12 @@ bot.on("message", (ctx, next) => {
     "Unsupported message type. Please send a photo with caption, followed by audio with caption, then a voice message."
   );
 });
+
+setInterval(() => {
+  postDueScheduledChunks().catch((error) => {
+    console.error("Error while posting scheduled chunks", error);
+  });
+}, 30 * 1000);
 
 bot.launch().then(() => {
   console.log("Bot started");
