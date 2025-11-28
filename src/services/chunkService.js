@@ -171,8 +171,10 @@ class ChunkService {
 
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,
-          "Failed to post your scheduled chunk. Please try scheduling again."
+          "Failed to post your scheduled chunk. It has been deleted, please try scheduling again."
         );
+
+        this.repository.removeScheduled(scheduled.id);
       }
     }
   }
