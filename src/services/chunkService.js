@@ -116,19 +116,19 @@ class ChunkService {
       return {
         success: false,
         message:
-          "No complete chunk to post. Please send photo, audio, and voice in order.",
+          "بسته برای ارسال کامل نیست. لطفاً به ترتیب عکس، فایل صوتی و ویس را بفرست.",
       };
     }
 
     try {
       await this.sendChunkToChannel(chunk);
       this.resetChunk(session);
-      return { success: true, message: "Posted to channel ✅" };
+      return { success: true, message: "در کانال ارسال شد ✅" };
     } catch (error) {
       console.error("Failed to post chunk", error);
       return {
         success: false,
-        message: "Failed to post to channel. Please try again.",
+        message: "ارسال به کانال ناموفق بود. لطفاً دوباره تلاش کن.",
       };
     }
   }
@@ -140,7 +140,7 @@ class ChunkService {
       return {
         success: false,
         message:
-          "No complete chunk to schedule. Please send photo, audio, and voice in order.",
+          "بسته برای زمان‌بندی کامل نیست. لطفاً به ترتیب عکس، فایل صوتی و ویس را بفرست.",
       };
     }
 
@@ -149,7 +149,7 @@ class ChunkService {
 
     return {
       success: true,
-      message: `Chunk scheduled for ${scheduledAt.toLocaleString()}.`,
+      message: `بسته برای ${scheduledAt.toLocaleString()} زمان‌بندی شد.`,
     };
   }
 
@@ -164,14 +164,14 @@ class ChunkService {
 
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,
-          `Scheduled chunk posted to channel at ${new Date().toLocaleString()}.`
+          `بسته زمان‌بندی‌شده در ${new Date().toLocaleString()} در کانال ارسال شد.`
         );
       } catch (error) {
         console.error("Failed to post scheduled chunk", error);
 
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,
-          "Failed to post your scheduled chunk. It has been deleted, please try scheduling again."
+          "ارسال بسته زمان‌بندی‌شده ناموفق بود و حذف شد؛ لطفاً دوباره زمان‌بندی کن."
         );
 
         this.repository.removeScheduled(scheduled.id);
