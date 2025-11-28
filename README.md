@@ -3,11 +3,12 @@
 A production-ready Telegram bot built with Node.js and Telegraf to collect three related messages (photo with caption, audio with caption, and voice message) from private chats and repost them to a configured Telegram channel as fresh posts. Each chunk can also be scheduled for future release and all data is persisted in SQLite so the bot can restart without losing state.
 
 ## Features
-- Collects message chunks per user chat in strict order: photo → audio → voice.
+- Collects message chunks per user chat in strict order: photo → audio → voice (kept in Redis-backed Telegraf sessions).
 - Validates message order and resets on mistakes with clear feedback.
 - Posts completed chunks immediately or schedules them for a specified date/time.
-- Persists user chunks and schedules in SQLite (bundled via the system `sqlite3` CLI).
+- Persists schedules in SQLite (bundled via the system `sqlite3` CLI) while in-progress chunks remain in Redis sessions for smooth sequencing and scheduling prompts.
 - Commands: `/start`, `/post`, `/schedule`, `/cancel`.
+- Inline keyboards for quick "post now", "schedule", or "cancel" actions when a chunk is ready.
 - Startup environment validation and structured layering (config → infrastructure → repositories → services → bot handlers).
 - Basic logging for startup, chunk lifecycle, and scheduled posting loop.
 
@@ -31,8 +32,9 @@ Keep both `index.js` and `src/app.js`: `index.js` is intentionally minimal so it
    ```bash
    export BOT_TOKEN="<your_bot_token>"
    export CHANNEL_ID="<your_channel_username_or_id>"
-   # Optional: override the SQLite file path
+   # Optional: override the SQLite file path and Redis connection
    export DATABASE_PATH="data.sqlite"
+   export REDIS_URL="redis://localhost:6379"
    ```
 3. Run the bot:
    ```bash

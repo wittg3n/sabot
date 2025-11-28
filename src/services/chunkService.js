@@ -5,47 +5,62 @@ class ChunkService {
     this.repository = repository;
     this.bot = bot;
     this.channelId = channelId;
-
-    // Chats that are currently in "please send me the date/time" mode
-    this.pendingScheduleChatIds = new Set();
   }
 
   // ----- chunk state -----
 
-  getChunk(chatId) {
-    return this.repository.getByChatId(chatId);
+  getChunk(session) {
+    return session.chunk;
   }
 
-  startChunk(chatId, photo, caption) {
-    this.repository.startChunk(chatId, photo.file_id, caption);
+  startChunk(session, photo, caption) {
+    session.chunk = {
+      step: 1,
+      photo_file_id: photo.file_id,
+      photo_caption: caption || '',
+    };
+    this.clearScheduleRequest(session);
   }
 
-  addAudio(chatId, audio, caption) {
-    this.repository.addAudio(chatId, audio.file_id, caption);
+  addAudio(session, audio, caption) {
+    if (!session.chunk) return;
+
+    session.chunk = {
+      ...session.chunk,
+      step: 2,
+      audio_file_id: audio.file_id,
+      audio_caption: caption || '',
+    };
   }
 
-  addVoice(chatId, voice, caption) {
-    this.repository.addVoice(chatId, voice.file_id, caption);
+  addVoice(session, voice, caption) {
+    if (!session.chunk) return;
+
+    session.chunk = {
+      ...session.chunk,
+      step: 3,
+      voice_file_id: voice.file_id,
+      voice_caption: caption || '',
+    };
   }
 
-  resetChunk(chatId) {
-    // Clear both DB state and any pending schedule state
-    this.repository.reset(chatId);
-    this.clearScheduleRequest(chatId);
+  resetChunk(session) {
+    session.chunk = null;
+    this.clearScheduleRequest(session);
   }
 
   // ----- schedule state helpers -----
 
-  requestScheduleInput(chatId) {
-    this.pendingScheduleChatIds.add(chatId);
+  requestScheduleInput(session) {
+    session.waitingForSchedule = true;
   }
 
-  isWaitingForSchedule(chatId) {
-    return this.pendingScheduleChatIds.has(chatId);
+  isWaitingForSchedule(session) {
+    return Boolean(session.waitingForSchedule);
   }
 
-  clearScheduleRequest(chatId) {
-    this.pendingScheduleChatIds.delete(chatId);
+  clearScheduleRequest(session) {
+    session.waitingForSchedule = false;
   }
 
   // ----- parsing / validation -----
@@ -94,8 +109,8 @@ class ChunkService {
     });
   }
 
-  async postChunk(chatId) {
-    const chunk = this.getChunk(chatId);
+  async postChunk(chatId, session) {
+    const chunk = this.getChunk(session);
 
     if (!chunk || chunk.step !== 3) {
       return {
@@ -107,7 +122,7 @@ class ChunkService {
 
     try {
       await this.sendChunkToChannel(chunk);
-      this.resetChunk(chatId);
+      this.resetChunk(session);
       return { success: true, message: "Posted to channel ✅" };
     } catch (error) {
       console.error("Failed to post chunk", error);
@@ -118,8 +133,8 @@ class ChunkService {
     }
   }
 
-  scheduleChunk(chatId, scheduledAt) {
-    const chunk = this.getChunk(chatId);
+  scheduleChunk(chatId, session, scheduledAt) {
+    const chunk = this.getChunk(session);
 
     if (!chunk || chunk.step !== 3) {
       return {
@@ -130,7 +145,7 @@ class ChunkService {
     }
 
     this.repository.schedule(chatId, chunk, scheduledAt);
-    this.resetChunk(chatId);
+    this.resetChunk(session);
 
     return {
       success: true,
