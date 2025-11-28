@@ -14,18 +14,6 @@ function createApp() {
   const repository = new ChunkRepository(db);
   const service = new ChunkService({ repository, bot, channelId: config.channelId });
 
-  const allowedUsers = new Set(config.allowedUserIds);
-
-  bot.use((ctx, next) => {
-    const userId = ctx.from?.id;
-
-    if (!userId || !allowedUsers.has(userId)) {
-      return ctx.reply('you dont have premittion');
-    }
-
-    return next();
-  });
-
   registerChunkHandlers(bot, service);
 
   setInterval(() => {
