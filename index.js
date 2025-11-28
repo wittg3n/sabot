@@ -19,7 +19,7 @@ const chunks = {};
 const scheduledChunks = [];
 
 function resetChunk(chatId) {
-  delete chunks[chatId];
+  db.prepare('DELETE FROM chunks WHERE chat_id = ?').run(chatId);
 }
 
 function startNewChunk(chatId, photo, caption) {
@@ -60,7 +60,7 @@ async function sendChunkToChannel(chunk) {
 }
 
 async function postChunkToChannel(chatId, ctx) {
-  const chunk = chunks[chatId];
+  const chunk = getChunk(chatId);
   if (!chunk || chunk.step !== 3) {
     await ctx.reply(
       "No complete chunk to post. Please send photo, audio, and voice in order."
@@ -138,6 +138,81 @@ async function postDueScheduledChunks() {
   }
 }
 
+function parseScheduleInput(input) {
+  if (!input) {
+    return null;
+  }
+
+  const [datePart, timePart = '00:00'] = input.trim().split(/\s+/);
+  const [day, month, year] = (datePart || '').split('/').map(Number);
+  const [hour, minute = 0] = (timePart || '').split(':').map(Number);
+
+  if (!day || !month || !year || Number.isNaN(hour) || Number.isNaN(minute)) {
+    return null;
+  }
+
+  const scheduledAt = new Date(year, month - 1, day, hour, minute);
+
+  if (Number.isNaN(scheduledAt.getTime())) {
+    return null;
+  }
+
+  return scheduledAt;
+}
+
+function scheduleChunkForRelease(chatId, chunk, scheduledAt, ctx) {
+  db.prepare(
+    `INSERT INTO scheduled_chunks (
+      chat_id,
+      scheduled_at,
+      photo_file_id,
+      photo_caption,
+      audio_file_id,
+      audio_caption,
+      voice_file_id,
+      voice_caption
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run(
+    chatId,
+    scheduledAt.getTime(),
+    chunk.photo_file_id,
+    chunk.photo_caption,
+    chunk.audio_file_id,
+    chunk.audio_caption,
+    chunk.voice_file_id,
+    chunk.voice_caption,
+  );
+
+  resetChunk(chatId);
+  ctx.reply(`Chunk scheduled for ${scheduledAt.toLocaleString()}.`);
+  console.log(`Chunk scheduled for chat ${chatId} at ${scheduledAt.toISOString()}`);
+}
+
+async function postDueScheduledChunks() {
+  const now = new Date();
+  const dueChunks = db
+    .prepare('SELECT * FROM scheduled_chunks WHERE scheduled_at <= ? ORDER BY scheduled_at ASC')
+    .all(now.getTime());
+
+  dueChunks.forEach(async (scheduled) => {
+    try {
+      await sendChunkToChannel(scheduled);
+      db.prepare('DELETE FROM scheduled_chunks WHERE id = ?').run(scheduled.id);
+      console.log(`Scheduled chunk posted for chat ${scheduled.chat_id}`);
+      await bot.telegram.sendMessage(
+        scheduled.chat_id,
+        `Scheduled chunk posted to channel at ${new Date().toLocaleString()}.`,
+      );
+    } catch (error) {
+      console.error('Failed to post scheduled chunk', error);
+      await bot.telegram.sendMessage(
+        scheduled.chat_id,
+        'Failed to post your scheduled chunk. Please try scheduling again.',
+      );
+    }
+  });
+}
+
 function sendOrderError(ctx) {
   resetChunk(ctx.chat.id);
   return ctx.reply(
@@ -187,7 +262,7 @@ bot.command("schedule", (ctx) => {
 
 bot.on("photo", (ctx) => {
   const chatId = ctx.chat.id;
-  const current = chunks[chatId];
+  const current = getChunk(chatId);
 
   if (current) {
     return sendOrderError(ctx);
@@ -201,7 +276,7 @@ bot.on("photo", (ctx) => {
 
 bot.on("audio", (ctx) => {
   const chatId = ctx.chat.id;
-  const current = chunks[chatId];
+  const current = getChunk(chatId);
 
   if (!current || current.step !== 1) {
     return sendOrderError(ctx);
@@ -213,7 +288,7 @@ bot.on("audio", (ctx) => {
 
 bot.on("voice", (ctx) => {
   const chatId = ctx.chat.id;
-  const current = chunks[chatId];
+  const current = getChunk(chatId);
 
   if (!current || current.step !== 2) {
     return sendOrderError(ctx);
