@@ -7,9 +7,8 @@ function sendOrderError(ctx, service) {
 
 function registerChunkHandlers(bot, chunkService) {
   bot.start((ctx) => {
-    const timeInfo = chunkService.getCurrentTimeInfo();
     ctx.reply(
-      `Send a photo with caption, then an audio with caption, then a voice message. Use /post to publish immediately, /schedule <DD/MM/YYYY HH:MM[:SS]> to schedule, or /cancel to discard the current chunk. Current bot time: ${timeInfo.formatted}. Times are interpreted in ${timeInfo.offsetLabel}.`,
+      'Send a photo with caption, then an audio with caption, then a voice message. Use /post to publish immediately, /schedule <DD/MM/YYYY HH:MM> to schedule, or /cancel to discard the current chunk.',
     );
   });
 
@@ -27,20 +26,19 @@ function registerChunkHandlers(bot, chunkService) {
     const chatId = ctx.chat.id;
     const scheduleInput = ctx.message.text.replace('/schedule', '').trim();
     const scheduledAt = chunkService.parseScheduleInput(scheduleInput);
-    const timeInfo = chunkService.getCurrentTimeInfo();
 
     if (!scheduledAt) {
       return ctx.reply(
-        `Please provide a valid date/time in the format DD/MM/YYYY HH:MM[:SS]. Example: 17/02/2025 09:30:00. Current bot time: ${timeInfo.formatted}.`,
+        'Please provide a valid date/time in the format DD/MM/YYYY HH:MM (time is optional). Example: 17/02/2025 09:30',
       );
     }
 
     if (scheduledAt <= new Date()) {
-      return ctx.reply(`Scheduled time must be in the future. Current bot time: ${timeInfo.formatted}.`);
+      return ctx.reply('Scheduled time must be in the future.');
     }
 
     const result = chunkService.scheduleChunk(chatId, scheduledAt);
-    return ctx.reply(`${result.message} Current bot time: ${timeInfo.formatted}.`);
+    return ctx.reply(result.message);
   });
 
   bot.on('photo', (ctx) => {
@@ -78,10 +76,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addVoice(chatId, ctx.message.voice, ctx.message.caption);
-    const timeInfo = chunkService.getCurrentTimeInfo();
-    ctx.reply(
-      `Chunk ready. Send /post to publish to the channel, /schedule <DD/MM/YYYY HH:MM[:SS]> to delay posting, or /cancel to discard. Current bot time: ${timeInfo.formatted}. Times are interpreted in ${timeInfo.offsetLabel}.`,
-    );
+    ctx.reply('Chunk ready. Send /post to publish to the channel, /schedule <DD/MM/YYYY HH:MM> to delay posting, or /cancel to discard.');
   });
 
   bot.on('message', (ctx, next) => {

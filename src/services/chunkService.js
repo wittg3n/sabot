@@ -27,43 +27,20 @@ class ChunkService {
     this.repository.reset(chatId);
   }
 
-  getCurrentTimeInfo() {
-    const now = new Date();
-    const offsetMinutes = now.getTimezoneOffset();
-    const sign = offsetMinutes <= 0 ? '+' : '-';
-    const absolute = Math.abs(offsetMinutes);
-    const hours = String(Math.floor(absolute / 60)).padStart(2, '0');
-    const minutes = String(absolute % 60).padStart(2, '0');
-    const offsetLabel = `UTC${sign}${hours}:${minutes}`;
-
-    return {
-      now,
-      offsetLabel,
-      formatted: `${now.toLocaleString()} (${offsetLabel})`,
-    };
-  }
-
   parseScheduleInput(input) {
     if (!input) {
       return null;
     }
 
-    const [datePart, timePart = '00:00:00'] = input.trim().split(/\s+/);
+    const [datePart, timePart = '00:00'] = input.trim().split(/\s+/);
     const [day, month, year] = (datePart || '').split('/').map(Number);
-    const [hour, minute = 0, second = 0] = (timePart || '').split(':').map(Number);
+    const [hour, minute = 0] = (timePart || '').split(':').map(Number);
 
-    if (
-      !day ||
-      !month ||
-      !year ||
-      Number.isNaN(hour) ||
-      Number.isNaN(minute) ||
-      Number.isNaN(second)
-    ) {
+    if (!day || !month || !year || Number.isNaN(hour) || Number.isNaN(minute)) {
       return null;
     }
 
-    const scheduledAt = new Date(year, month - 1, day, hour, minute, second);
+    const scheduledAt = new Date(year, month - 1, day, hour, minute);
 
     if (Number.isNaN(scheduledAt.getTime())) {
       return null;
@@ -112,11 +89,7 @@ class ChunkService {
 
     this.repository.schedule(chatId, chunk, scheduledAt);
     this.resetChunk(chatId);
-    const { offsetLabel } = this.getCurrentTimeInfo();
-    return {
-      success: true,
-      message: `Chunk scheduled for ${scheduledAt.toLocaleString()} (${offsetLabel}).`,
-    };
+    return { success: true, message: `Chunk scheduled for ${scheduledAt.toLocaleString()}.` };
   }
 
   async postDueScheduled() {

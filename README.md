@@ -5,7 +5,7 @@ A production-ready Telegram bot built with Node.js and Telegraf to collect three
 ## Features
 - Collects message chunks per user chat in strict order: photo → audio → voice.
 - Validates message order and resets on mistakes with clear feedback.
-- Posts completed chunks immediately or schedules them for a specified date/time (HH:MM[:SS]) with the bot reporting its current timezone to avoid confusion.
+- Posts completed chunks immediately or schedules them for a specified date/time.
 - Persists user chunks and schedules in SQLite (bundled via the system `sqlite3` CLI).
 - Commands: `/start`, `/post`, `/schedule`, `/cancel`.
 - Startup environment validation and structured layering (config → infrastructure → repositories → services → bot handlers).
