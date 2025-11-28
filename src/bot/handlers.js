@@ -9,15 +9,15 @@ const ACTIONS = {
 };
 
 const readyKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback("Post now", ACTIONS.POST_NOW)],
-  [Markup.button.callback("Schedule", ACTIONS.SCHEDULE)],
-  [Markup.button.callback("Cancel", ACTIONS.CANCEL)],
+  [Markup.button.callback("ارسال فوری 🚀", ACTIONS.POST_NOW)],
+  [Markup.button.callback("زمان‌بندی ⏰", ACTIONS.SCHEDULE)],
+  [Markup.button.callback("لغو ❌", ACTIONS.CANCEL)],
 ]);
 
 function sendOrderError(ctx, service) {
   service.resetChunk(ctx.session);
   return ctx.reply(
-    "Unexpected message type or order. Chunk has been reset. Please start again with a photo (with caption)."
+    "نوع پیام یا ترتیب اشتباه بود. بسته ریست شد؛ لطفاً دوباره با ارسال عکس (همراه کپشن) شروع کن."
   );
 }
 
@@ -26,13 +26,13 @@ function registerChunkHandlers(bot, chunkService) {
   bot.start((ctx) => {
     ctx.reply(
       [
-        "Send a photo with caption, then an audio with caption, then a voice message.",
+        "سلام! 😊 برای آماده‌سازی یک بسته، ابتدا یک عکس با کپشن بفرست، بعد فایل صوتی با کپشن و در نهایت ویس را ارسال کن.",
         "",
-        "Commands:",
-        "• /post – publish immediately to the channel",
-        "• /schedule DD/MM/YYYY HH:MM – schedule in one step",
-        "• /schedule – then send the date/time in the next message",
-        "• /cancel – discard the current chunk",
+        "دستورات:",
+        "• /post — ارسال فوری در کانال",
+        "• /schedule DD/MM/YYYY HH:MM — زمان‌بندی مستقیم در یک مرحله",
+        "• /schedule — بعد از آن تاریخ/ساعت را در پیام بعدی بفرست",
+        "• /cancel — لغو و حذف بسته فعلی",
       ].join("\n")
     );
   });
@@ -41,7 +41,7 @@ function registerChunkHandlers(bot, chunkService) {
   bot.command("cancel", (ctx) => {
     const chatId = ctx.chat.id;
     chunkService.resetChunk(ctx.session);
-    ctx.reply("Current chunk canceled.");
+    ctx.reply("بسته فعلی لغو شد. اگر خواستی دوباره شروع کنی، از عکس آغاز کن!");
   });
 
   // /post
@@ -61,14 +61,14 @@ function registerChunkHandlers(bot, chunkService) {
 
       if (!chunk || chunk.step !== 3) {
         return ctx.reply(
-          "No complete chunk to schedule. Please send photo, audio, and voice in order."
+          "فعلاً بسته کاملی برای زمان‌بندی نداریم. لطفاً به ترتیب عکس، فایل صوتی و ویس را بفرست."
         );
       }
 
       chunkService.requestScheduleInput(ctx.session);
 
       return ctx.reply(
-        "Please provide the date/time for this chunk in the format DD/MM/YYYY HH:MM (time is optional). Example: 17/02/2025 09:30"
+        "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM وارد کن (ساعت اختیاری است). مثال: 17/02/2025 09:30"
       );
     }
 
@@ -77,12 +77,12 @@ function registerChunkHandlers(bot, chunkService) {
 
     if (!scheduledAt) {
       return ctx.reply(
-        "Please provide a valid date/time in the format DD/MM/YYYY HH:MM (time is optional). Example: 17/02/2025 09:30"
+        "تاریخ/ساعت درست نیست. قالب باید DD/MM/YYYY HH:MM باشد (ساعت اختیاری). مثال: 17/02/2025 09:30"
       );
     }
 
     if (scheduledAt <= new Date()) {
-      return ctx.reply("Scheduled time must be in the future.");
+      return ctx.reply("زمان انتخاب‌شده باید در آینده باشد. لطفاً دوباره امتحان کن.");
     }
 
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
@@ -102,7 +102,7 @@ function registerChunkHandlers(bot, chunkService) {
     const largestPhoto = photoSizes[photoSizes.length - 1];
 
     chunkService.startChunk(ctx.session, largestPhoto, ctx.message.caption);
-    ctx.reply("Photo received. Please send the audio file with its caption.");
+    ctx.reply("عکس رسید! حالا فایل صوتی را همراه کپشن بفرست. 🎶");
   });
 
   // Audio
@@ -115,7 +115,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addAudio(ctx.session, ctx.message.audio, ctx.message.caption);
-    ctx.reply("Audio received. Please send the voice message.");
+    ctx.reply("صدا رسید! لطفاً حالا ویس را بفرست تا بسته کامل شود. 🎤");
   });
 
   // Voice
@@ -129,7 +129,7 @@ function registerChunkHandlers(bot, chunkService) {
 
     chunkService.addVoice(ctx.session, ctx.message.voice, ctx.message.caption);
     ctx.reply(
-      "Chunk ready. Send /post to publish to the channel, /schedule DD/MM/YYYY HH:MM to delay posting, or /schedule to enter the date in the next message. Use /cancel to discard.",
+      "بسته آماده است! برای ارسال فوری /post را بفرست، برای زمان‌بندی با تاریخ /schedule DD/MM/YYYY HH:MM و برای وارد کردن تاریخ در پیام بعدی فقط /schedule را بفرست. برای لغو هم /cancel را بزن.",
       readyKeyboard
     );
   });
@@ -147,12 +147,12 @@ function registerChunkHandlers(bot, chunkService) {
 
     if (!scheduledAt) {
       return ctx.reply(
-        "Please provide a valid date/time in the format DD/MM/YYYY HH:MM (time is optional). Example: 17/02/2025 09:30"
+        "تاریخ/ساعت معتبر نیست. لطفاً با قالب DD/MM/YYYY HH:MM وارد کن. مثال: 17/02/2025 09:30"
       );
     }
 
     if (scheduledAt <= new Date()) {
-      return ctx.reply("Scheduled time must be in the future.");
+      return ctx.reply("باید زمانی در آینده را انتخاب کنی. دوباره تلاش کن.⏳");
     }
 
     // We got a valid date → schedule and clear the pending state
@@ -165,7 +165,7 @@ function registerChunkHandlers(bot, chunkService) {
     const result = await chunkService.postChunk(ctx.chat.id, ctx.session);
     await ctx.answerCbQuery(result.message, { show_alert: !result.success });
     if (result.success) {
-      await ctx.reply("Chunk posted.");
+      await ctx.reply("بسته ارسال شد و در کانال منتشر گردید. ✅");
     }
   });
 
@@ -173,21 +173,21 @@ function registerChunkHandlers(bot, chunkService) {
     const chunk = chunkService.getChunk(ctx.session);
 
     if (!chunk || chunk.step !== 3) {
-      await ctx.answerCbQuery("No complete chunk to schedule", { show_alert: true });
+      await ctx.answerCbQuery("بسته کامل برای زمان‌بندی موجود نیست.", { show_alert: true });
       return;
     }
 
     chunkService.requestScheduleInput(ctx.session);
     await ctx.answerCbQuery();
     await ctx.reply(
-      "Please provide the date/time for this chunk in the format DD/MM/YYYY HH:MM (time is optional). Example: 17/02/2025 09:30"
+      "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM بفرست (ساعت اختیاری است). مثال: 17/02/2025 09:30"
     );
   });
 
   bot.action(ACTIONS.CANCEL, async (ctx) => {
     chunkService.resetChunk(ctx.session);
-    await ctx.answerCbQuery("Chunk canceled");
-    await ctx.reply("Current chunk canceled.");
+    await ctx.answerCbQuery("بسته لغو شد.");
+    await ctx.reply("بسته فعلی لغو شد. هر وقت خواستی دوباره شروع کن!");
   });
 
   // Fallback for any other message types
@@ -198,7 +198,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     return ctx.reply(
-      "Unsupported message type. Please send a photo with caption, followed by audio with caption, then a voice message."
+      "این نوع پیام پشتیبانی نمی‌شود. لطفاً به ترتیب عکس با کپشن، فایل صوتی با کپشن و سپس ویس را بفرست."
     );
   });
 }
