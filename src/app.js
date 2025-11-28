@@ -1,18 +1,27 @@
 'use strict';
 
-const { Telegraf } = require('telegraf');
+const { Telegraf, session } = require('telegraf');
 const { registerChunkHandlers } = require('./bot/handlers');
 const ChunkService = require('./services/chunkService');
 const ChunkRepository = require('./repositories/chunkRepository');
 const Database = require('./infrastructure/sqlite');
+const { createRedisClient, RedisSessionStore } = require('./infrastructure/redis');
 const environment = require('./config/environment');
 
-function createApp() {
+async function createApp() {
   const config = environment.load();
   const bot = new Telegraf(config.botToken);
+  const redis = await createRedisClient(config.redisUrl);
   const db = new Database(config.databasePath);
   const repository = new ChunkRepository(db);
   const service = new ChunkService({ repository, bot, channelId: config.channelId });
+
+  bot.use(
+    session({
+      store: new RedisSessionStore(redis),
+      defaultSession: () => ({ chunk: null, waitingForSchedule: false }),
+    })
+  );
 
   registerChunkHandlers(bot, service);
 
@@ -22,7 +31,7 @@ function createApp() {
     });
   }, 30 * 1000);
 
-  return { bot };
+  return { bot, redis };
 }
 
 module.exports = { createApp };

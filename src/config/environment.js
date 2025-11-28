@@ -16,6 +16,7 @@ module.exports = {
       botToken: getRequiredEnv('BOT_TOKEN'),
       channelId: getRequiredEnv('CHANNEL_ID'),
       databasePath: process.env.DATABASE_PATH || 'data.sqlite',
+      redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
     };
   },
 };
