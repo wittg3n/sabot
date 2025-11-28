@@ -1,0 +1,45 @@
+'use strict';
+
+const { Telegraf } = require('telegraf');
+const { registerChunkHandlers } = require('./bot/handlers');
+const ChunkService = require('./services/chunkService');
+const ChunkRepository = require('./repositories/chunkRepository');
+const Database = require('./infrastructure/sqlite');
+const environment = require('./config/environment');
+
+function createApp() {
+  const config = environment.load();
+  const bot = new Telegraf(config.botToken);
+  const db = new Database(config.databasePath);
+  const repository = new ChunkRepository(db);
+  const service = new ChunkService({ repository, bot, channelId: config.channelId });
+
+  const allowedUsers = new Set(config.allowedUserIds);
+
+  bot.use((ctx, next) => {
+    const userId = ctx.from?.id;
+
+    if (!userId || !allowedUsers.has(userId)) {
+      return ctx.reply('you dont have premittion');
+    }
+
+    return next();
+  });
+
+  registerChunkHandlers(bot, service);
+
+  const scheduler = setInterval(() => {
+    service.postDueScheduled().catch((error) => {
+      console.error('Error while posting scheduled chunks', error);
+    });
+  }, 30 * 1000);
+
+  return {
+    bot,
+    stop() {
+      clearInterval(scheduler);
+    },
+  };
+}
+
+module.exports = { createApp };

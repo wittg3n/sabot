@@ -1,14 +1,26 @@
 # KIAGram Telegram Bot
 
-A production-ready Telegram bot built with Node.js and Telegraf to collect three related messages (photo with caption, audio with caption, and voice message) from private chats and repost them to a configured Telegram channel as fresh posts.
+A production-ready Telegram bot built with Node.js and Telegraf to collect three related messages (photo with caption, audio with caption, and voice message) from private chats and repost them to a configured Telegram channel as fresh posts. Each chunk can also be scheduled for future release and all data is persisted in SQLite so the bot can restart without losing state.
 
 ## Features
 - Collects message chunks per user chat in strict order: photo → audio → voice.
 - Validates message order and resets on mistakes with clear feedback.
-- Posts completed chunks to a target channel using `sendPhoto`, `sendAudio`, and `sendVoice`.
-- Commands: `/start`, `/post`, `/cancel`.
-- In-memory per-chat storage; supports multiple users concurrently.
-- Basic logging for startup, chunk lifecycle, and posting.
+- Posts completed chunks immediately or schedules them for a specified date/time (HH:MM[:SS]) with the bot reporting its current timezone to avoid confusion.
+- Persists user chunks and schedules in SQLite (bundled via the system `sqlite3` CLI).
+- Commands: `/start`, `/post`, `/schedule`, `/cancel`.
+- Startup environment validation and structured layering (config → infrastructure → repositories → services → bot handlers).
+- Basic logging for startup, chunk lifecycle, and scheduled posting loop.
+
+## Project structure
+- `index.js`: the runtime entrypoint. It constructs the bot by calling `createApp` from `src/app.js`, starts the Telegraf instance, and handles shutdown signals. Keep this file as the single executable entry for `npm start` or hosting platforms.
+- `src/app.js`: the application factory that wires configuration, database connection, repositories, services, bot handlers, and the scheduler loop. This remains separate so the initialization logic can be imported or tested without side effects.
+- `src/config/environment.js`: environment loading and validation.
+- `src/infrastructure/sqlite.js`: lightweight SQLite helper around the `sqlite3` CLI.
+- `src/repositories/chunkRepository.js`: data access for chunks and schedules.
+- `src/services/chunkService.js`: business logic for validating chunks, scheduling, and posting to the channel.
+- `src/bot/handlers.js`: Telegraf command and message handlers that delegate to the service layer.
+
+Keep both `index.js` and `src/app.js`: `index.js` is intentionally minimal so it can be the single entrypoint, while `src/app.js` encapsulates wiring and can be reused in tests or other runners.
 
 ## Setup
 1. Install dependencies:
@@ -19,6 +31,8 @@ A production-ready Telegram bot built with Node.js and Telegraf to collect three
    ```bash
    export BOT_TOKEN="<your_bot_token>"
    export CHANNEL_ID="<your_channel_username_or_id>"
+   # Optional: override the SQLite file path
+   export DATABASE_PATH="data.sqlite"
    ```
 3. Run the bot:
    ```bash
