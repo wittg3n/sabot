@@ -45,9 +45,9 @@ Thumbs.db
 
 # TypeScript (if used)
 *.tsbuildinfo
+data.sqlite
 
 # Optional lock files (if you don’t want them)
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
-.env
