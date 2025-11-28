@@ -1,11 +1,16 @@
-'use strict';
+"use strict";
 
 class ChunkService {
   constructor({ repository, bot, channelId }) {
     this.repository = repository;
     this.bot = bot;
     this.channelId = channelId;
+
+    // Chats that are currently in "please send me the date/time" mode
+    this.pendingScheduleChatIds = new Set();
   }
+
+  // ----- chunk state -----
 
   getChunk(chatId) {
     return this.repository.getByChatId(chatId);
@@ -24,17 +29,41 @@ class ChunkService {
   }
 
   resetChunk(chatId) {
+    // Clear both DB state and any pending schedule state
     this.repository.reset(chatId);
+    this.clearScheduleRequest(chatId);
   }
+
+  // ----- schedule state helpers -----
+
+  requestScheduleInput(chatId) {
+    this.pendingScheduleChatIds.add(chatId);
+  }
+
+  isWaitingForSchedule(chatId) {
+    return this.pendingScheduleChatIds.has(chatId);
+  }
+
+  clearScheduleRequest(chatId) {
+    this.pendingScheduleChatIds.delete(chatId);
+  }
+
+  // ----- parsing / validation -----
 
   parseScheduleInput(input) {
     if (!input) {
       return null;
     }
 
-    const [datePart, timePart = '00:00'] = input.trim().split(/\s+/);
-    const [day, month, year] = (datePart || '').split('/').map(Number);
-    const [hour, minute = 0] = (timePart || '').split(':').map(Number);
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    // Expect "DD/MM/YYYY" or "DD/MM/YYYY HH:MM"
+    const [datePart, timePart = "00:00"] = trimmed.split(/\s+/);
+    const [day, month, year] = (datePart || "").split("/").map(Number);
+    const [hour, minute = 0] = (timePart || "").split(":").map(Number);
 
     if (!day || !month || !year || Number.isNaN(hour) || Number.isNaN(minute)) {
       return null;
@@ -48,6 +77,8 @@ class ChunkService {
 
     return scheduledAt;
   }
+
+  // ----- sending -----
 
   async sendChunkToChannel(chunk) {
     await this.bot.telegram.sendPhoto(this.channelId, chunk.photo_file_id, {
@@ -67,16 +98,23 @@ class ChunkService {
     const chunk = this.getChunk(chatId);
 
     if (!chunk || chunk.step !== 3) {
-      return { success: false, message: 'No complete chunk to post. Please send photo, audio, and voice in order.' };
+      return {
+        success: false,
+        message:
+          "No complete chunk to post. Please send photo, audio, and voice in order.",
+      };
     }
 
     try {
       await this.sendChunkToChannel(chunk);
       this.resetChunk(chatId);
-      return { success: true, message: 'Posted to channel ✅' };
+      return { success: true, message: "Posted to channel ✅" };
     } catch (error) {
-      console.error('Failed to post chunk', error);
-      return { success: false, message: 'Failed to post to channel. Please try again.' };
+      console.error("Failed to post chunk", error);
+      return {
+        success: false,
+        message: "Failed to post to channel. Please try again.",
+      };
     }
   }
 
@@ -84,12 +122,20 @@ class ChunkService {
     const chunk = this.getChunk(chatId);
 
     if (!chunk || chunk.step !== 3) {
-      return { success: false, message: 'No complete chunk to schedule. Please send photo, audio, and voice in order.' };
+      return {
+        success: false,
+        message:
+          "No complete chunk to schedule. Please send photo, audio, and voice in order.",
+      };
     }
 
     this.repository.schedule(chatId, chunk, scheduledAt);
     this.resetChunk(chatId);
-    return { success: true, message: `Chunk scheduled for ${scheduledAt.toLocaleString()}.` };
+
+    return {
+      success: true,
+      message: `Chunk scheduled for ${scheduledAt.toLocaleString()}.`,
+    };
   }
 
   async postDueScheduled() {
@@ -100,15 +146,17 @@ class ChunkService {
       try {
         await this.sendChunkToChannel(scheduled);
         this.repository.removeScheduled(scheduled.id);
+
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,
-          `Scheduled chunk posted to channel at ${new Date().toLocaleString()}.`,
+          `Scheduled chunk posted to channel at ${new Date().toLocaleString()}.`
         );
       } catch (error) {
-        console.error('Failed to post scheduled chunk', error);
+        console.error("Failed to post scheduled chunk", error);
+
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,
-          'Failed to post your scheduled chunk. Please try scheduling again.',
+          "Failed to post your scheduled chunk. Please try scheduling again."
         );
       }
     }
