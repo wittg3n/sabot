@@ -14,32 +14,15 @@ function createApp() {
   const repository = new ChunkRepository(db);
   const service = new ChunkService({ repository, bot, channelId: config.channelId });
 
-  const allowedUsers = new Set(config.allowedUserIds);
-
-  bot.use((ctx, next) => {
-    const userId = ctx.from?.id;
-
-    if (!userId || !allowedUsers.has(userId)) {
-      return ctx.reply('you dont have premittion');
-    }
-
-    return next();
-  });
-
   registerChunkHandlers(bot, service);
 
-  const scheduler = setInterval(() => {
+  setInterval(() => {
     service.postDueScheduled().catch((error) => {
       console.error('Error while posting scheduled chunks', error);
     });
   }, 30 * 1000);
 
-  return {
-    bot,
-    stop() {
-      clearInterval(scheduler);
-    },
-  };
+  return { bot };
 }
 
 module.exports = { createApp };
