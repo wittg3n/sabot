@@ -1,11 +1,20 @@
 "use strict";
 
 const { Markup } = require("telegraf");
+const path = require("path");
+
+const {
+  convertToOgg,
+  getAudioDuration,
+} = require("../services/musicConverterService");
+const { downloadFile } = require("../services/musicDownloaderService");
 
 const ACTIONS = {
   POST_NOW: "chunk:post_now",
   SCHEDULE: "chunk:schedule",
   CANCEL: "chunk:cancel",
+  CONVERT_AUDIO: "chunk:convert_audio",
+  SKIP_CONVERT: "chunk:skip_convert",
 };
 
 const readyKeyboard = Markup.inlineKeyboard([
@@ -126,7 +135,23 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addAudio(ctx.session, ctx.message.audio, ctx.message.caption);
-    ctx.reply("صدا رسید! لطفاً حالا ویس را بفرست تا بسته کامل شود. 🎤");
+    ctx.reply(
+      "صدا رسید! میخوای همین آهنگو تبدیل به ویس کنم یا خودت ویس می‌فرستی؟",
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback(
+            "میخوای همین آهنگو تبدیل به ویس کنم؟",
+            ACTIONS.CONVERT_AUDIO
+          ),
+        ],
+        [
+          Markup.button.callback(
+            "نه خودم ویس دارم",
+            ACTIONS.SKIP_CONVERT
+          ),
+        ],
+      ])
+    );
   });
 
   // Voice
@@ -201,6 +226,59 @@ function registerChunkHandlers(bot, chunkService) {
     chunkService.resetChunk(ctx.session);
     await ctx.answerCbQuery("بسته لغو شد.");
     await ctx.reply("بسته فعلی لغو شد. هر وقت خواستی دوباره شروع کن!");
+  });
+
+  bot.action(ACTIONS.SKIP_CONVERT, async (ctx) => {
+    const chunk = chunkService.getChunk(ctx.session);
+
+    if (!chunk || chunk.step !== 2) {
+      await ctx.answerCbQuery("اول باید آهنگ ارسال شود.", { show_alert: true });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+    await ctx.reply("باشه، حالا ویس رو بفرست تا بسته کامل بشه. 🎤");
+  });
+
+  bot.action(ACTIONS.CONVERT_AUDIO, async (ctx) => {
+    const chunk = chunkService.getChunk(ctx.session);
+
+    if (!chunk || chunk.step !== 2 || !chunk.audio_file_id) {
+      await ctx.answerCbQuery("اول باید آهنگ ارسال شود.", { show_alert: true });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+
+    try {
+      const telegramId = ctx.from.id;
+      const audioPath = await downloadFile(chunk.audio_file_id, telegramId);
+      const duration = await getAudioDuration(audioPath);
+      const oggPath = path.join(
+        __dirname,
+        "../../userdata",
+        `${telegramId}`,
+        `${chunk.audio_file_id}.ogg`
+      );
+
+      await convertToOgg(audioPath, oggPath, 0, duration);
+
+      const voiceMessage = await ctx.replyWithVoice({ source: oggPath });
+
+      chunkService.addVoice(
+        ctx.session,
+        voiceMessage.voice,
+        chunk.audio_caption || ""
+      );
+
+      await ctx.reply(
+        "ویس آماده شد! برای ارسال فوری /post را بفرست یا برای زمان‌بندی /schedule را ارسال کن.",
+        readyKeyboard
+      );
+    } catch (error) {
+      console.error("Failed to convert audio to voice", error);
+      await ctx.reply("تبدیل آهنگ به ویس با خطا مواجه شد. لطفاً ویس را خودت بفرست.");
+    }
   });
 
   // Fallback for any other message types

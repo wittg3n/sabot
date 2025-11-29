@@ -1,30 +1,37 @@
 const path = require("path");
 const fs = require("fs");
-const axios = require("axios");
 
 const downloadFile = async (fileId, telegramId) => {
   try {
     console.log("we are in downloader.js");
-    // Step 1: Get file path from Telegram API
-    const fileResponse = await axios.get(
-      `https://api.telegram.org/bot${process.env.TOKEN}/getFile`,
-      {
-        params: { file_id: fileId },
-      }
+    const getFileUrl = new URL(
+      `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getFile`
     );
+    getFileUrl.searchParams.set("file_id", fileId);
 
-    const filePath = fileResponse.data.result.file_path;
-    const downloadUrl = `https://api.telegram.org/file/bot${process.env.TOKEN}/${filePath}`;
+    const fileResponse = await fetch(getFileUrl);
 
-    const response = await axios.get(downloadUrl, {
-      responseType: "arraybuffer",
-    });
+    if (!fileResponse.ok) {
+      throw new Error(`Failed to fetch file info: ${fileResponse.statusText}`);
+    }
 
-    const outputDir = path.join(
-      __dirname,
-      "../../../userdata",
-      String(telegramId)
-    );
+    const fileMetadata = await fileResponse.json();
+    const filePath = fileMetadata?.result?.file_path;
+
+    if (!filePath) {
+      throw new Error("Telegram did not return a file path for the audio.");
+    }
+
+    const downloadUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
+    const response = await fetch(downloadUrl);
+
+    if (!response.ok) {
+      throw new Error(`Failed to download file: ${response.statusText}`);
+    }
+
+    const fileBuffer = Buffer.from(await response.arrayBuffer());
+
+    const outputDir = path.join(__dirname, "../../userdata", String(telegramId));
 
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -33,7 +40,7 @@ const downloadFile = async (fileId, telegramId) => {
 
     const fileOutputPath = path.join(outputDir, `${fileId}.mp3`);
 
-    fs.writeFileSync(fileOutputPath, response.data);
+    fs.writeFileSync(fileOutputPath, fileBuffer);
     console.log(`File successfully downloaded: ${fileOutputPath}`);
     return fileOutputPath;
   } catch (error) {
