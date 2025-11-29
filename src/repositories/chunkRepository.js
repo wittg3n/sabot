@@ -112,6 +112,14 @@ class ChunkRepository {
       .all(now.getTime());
   }
 
+  fetchUpcomingByChatId(chatId, now = new Date()) {
+    return this.db
+      .prepare(
+        'SELECT * FROM scheduled_chunks WHERE chat_id = ? AND scheduled_at > ? ORDER BY scheduled_at ASC'
+      )
+      .all(chatId, now.getTime());
+  }
+
   removeScheduled(id) {
     this.db.prepare('DELETE FROM scheduled_chunks WHERE id = ?').run(id);
   }
