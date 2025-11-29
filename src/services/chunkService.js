@@ -63,6 +63,12 @@ class ChunkService {
     session.waitingForSchedule = false;
   }
 
+  // ----- upcoming schedules -----
+
+  getUpcomingSchedules(chatId, now = new Date()) {
+    return this.repository.fetchUpcomingByChatId(chatId, now);
+  }
+
   // ----- parsing / validation -----
 
   parseScheduleInput(input) {
