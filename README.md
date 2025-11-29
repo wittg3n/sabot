@@ -1,4 +1,4 @@
-# 🤖 KIAGram - Telegram Content Scheduler
+# 🤖 SaBot - Telegram Content Scheduler
 
 ![License](https://img.shields.io/badge/license-ISC-brightgreen.svg)
 ![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)
@@ -10,6 +10,7 @@
 KIAGram is a production-ready Telegram bot built with **Telegraf**. It collects a three-step "chunk" (photo + caption → audio + caption → voice note) from private chats and posts or schedules the compiled post to a channel. The bot ships with inline keyboards, upcoming schedule previews, and structured logging so it is ready to deploy.
 
 ## 🚀 Features
+
 - 🧭 **Guided onboarding**: `/start` opens with inline actions for starting a batch, viewing the quick guide, or checking upcoming schedules.
 - 🎛️ **Inline-first flow**: Users complete or schedule chunks entirely via inline keyboards—no exposed command text.
 - ⏰ **Scheduling with previews**: Shows all upcoming scheduled chunks for the chat and surfaces them again whenever a schedule action is chosen.
@@ -19,6 +20,7 @@ KIAGram is a production-ready Telegram bot built with **Telegraf**. It collects 
 - 📜 **Structured logging**: Winston-powered console + rotating file logs with contextual metadata across startup, scheduling, and media handling.
 
 ## 📋 Requirements
+
 Install the following before running the bot:
 
 - [**Node.js**](https://nodejs.org/) v18+ 🟩
@@ -27,7 +29,9 @@ Install the following before running the bot:
 - [**FFmpeg**](https://ffmpeg.org/) v4+ 🎥
 
 ## 🧭 Quickstart
+
 1. **Clone & install**
+
    ```bash
    git clone https://github.com/your-username/kiagram.git
    cd kiagram
@@ -35,6 +39,7 @@ Install the following before running the bot:
    ```
 
 2. **Configure environment** (via `.env` or shell):
+
    ```bash
    export BOT_TOKEN="<telegram_bot_token>"
    export CHANNEL_ID="<target_channel_username_or_id>"
@@ -44,6 +49,7 @@ Install the following before running the bot:
    ```
 
 3. **Run the bot**
+
    ```bash
    node index.js
    ```
@@ -53,6 +59,7 @@ Install the following before running the bot:
    - Follow the inline prompts to send **photo → audio → voice**. Choose **Post now** or **Schedule** via inline buttons; upcoming schedules are displayed whenever you schedule.
 
 ## 🧱 Project structure
+
 ```bash
 📦 kiagram/
 ├── index.js                 # Entrypoint that wires and launches the bot
@@ -75,17 +82,21 @@ Install the following before running the bot:
 ```
 
 ## 🛠️ Configuration notes
+
 - **Channel permissions**: Ensure the bot is an admin of the target channel so it can post scheduled content.
 - **Logging**: Default transports write to console and rotating log files. Adjust levels or paths in `src/logger.js`.
 - **Scheduler**: Uses SQLite-backed schedule queue; the loop starts automatically from `src/app.js` during startup.
 
 ## 📚 Usage tips
+
 - Stay within the **photo → audio → voice** order. If you misorder a step, the bot will reset the current batch and guide you.
 - Use **Upcoming Schedules** from the inline keyboard to confirm what is queued before adding new slots.
 - To redeploy, keep `index.js` as the runtime entry; `src/app.js` contains the injectable wiring for tests or alternative runners.
 
 ## 🤝 Contributing
+
 Contributions are welcome! Please fork the repo, open a feature branch, and submit a pull request. For significant changes, open an issue first to discuss the proposal.
 
 ## 📝 License
+
 This project is licensed under the ISC License. See the [LICENSE](LICENSE) file for details.
