@@ -7,7 +7,7 @@
 ![Redis](https://img.shields.io/badge/Redis-6%2B-red.svg)
 ![FFmpeg](https://img.shields.io/badge/FFmpeg-4%2B-black.svg)
 
-KIAGram is a production-ready Telegram bot built with **Telegraf**. It collects a three-step "chunk" (photo + caption → audio + caption → voice note) from private chats and posts or schedules the compiled post to a channel. The bot ships with inline keyboards, upcoming schedule previews, and structured logging so it is ready to deploy.
+SaBot is a production-ready Telegram bot built with **Telegraf**. It collects a three-step "chunk" (photo + caption → audio + caption → voice note) from private chats and posts or schedules the compiled post to a channel. The bot ships with inline keyboards, upcoming schedule previews, and structured logging so it is ready to deploy.
 
 ## 🚀 Features
 
@@ -33,8 +33,8 @@ Install the following before running the bot:
 1. **Clone & install**
 
    ```bash
-   git clone https://github.com/your-username/kiagram.git
-   cd kiagram
+   git clone https://github.com/your-username/sabot.git
+   cd sabot
    npm install
    ```
 
@@ -61,7 +61,7 @@ Install the following before running the bot:
 ## 🧱 Project structure
 
 ```bash
-📦 kiagram/
+📦 sabot/
 ├── index.js                 # Entrypoint that wires and launches the bot
 ├── sqlite-db.js             # SQLite helper for CLI-backed persistence
 ├── src/
