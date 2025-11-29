@@ -17,7 +17,6 @@ const ACTIONS = {
   CONVERT_AUDIO: "chunk:convert_audio",
   SKIP_CONVERT: "chunk:skip_convert",
   VIEW_SCHEDULES: "chunk:view_schedules",
-  START_GUIDE: "chunk:start_guide",
 };
 
 const readyKeyboard = Markup.inlineKeyboard([
@@ -25,11 +24,6 @@ const readyKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback("زمان‌بندی ⏰", ACTIONS.SCHEDULE)],
   [Markup.button.callback("برنامه‌های پیش‌رو 🗓️", ACTIONS.VIEW_SCHEDULES)],
   [Markup.button.callback("لغو ❌", ACTIONS.CANCEL)],
-]);
-
-const startKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback("شروع بسته جدید ✨", ACTIONS.START_GUIDE)],
-  [Markup.button.callback("برنامه‌های پیش‌رو 🗓️", ACTIONS.VIEW_SCHEDULES)],
 ]);
 
 function formatUpcomingSchedules(upcoming) {
@@ -75,7 +69,7 @@ function registerChunkHandlers(bot, chunkService) {
         "",
         "بعد از کامل شدن بسته، دکمه‌های مدیریت (ارسال فوری، زمان‌بندی و برنامه‌های پیش‌رو) ظاهر می‌شوند تا حرفه‌ای تصمیم بگیری.",
         "",
-        "هر وقت آماده‌ای، از دکمه‌های زیر برای شروع و دیدن برنامه‌ها استفاده کن. ✨",
+        "هر وقت آماده‌ای، با ارسال عکس شروع کن. ✨",
       ].join("\n"),
       { parse_mode: "Markdown", ...startKeyboard }
     );
@@ -134,7 +128,6 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
-    logger.info("Scheduled via command", { chatId, success: result.success });
     return ctx.reply(result.message).then(() => replyWithUpcomingSchedules(ctx, chunkService));
   });
 
@@ -226,7 +219,6 @@ function registerChunkHandlers(bot, chunkService) {
     // We got a valid date → schedule and clear the pending state
     chunkService.clearScheduleRequest(ctx.session);
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
-    logger.info("Scheduled via text reply", { chatId, success: result.success });
     return ctx.reply(result.message).then(() => replyWithUpcomingSchedules(ctx, chunkService));
   });
 
@@ -318,20 +310,6 @@ function registerChunkHandlers(bot, chunkService) {
   bot.action(ACTIONS.VIEW_SCHEDULES, async (ctx) => {
     await ctx.answerCbQuery();
     await replyWithUpcomingSchedules(ctx, chunkService);
-  });
-
-  bot.action(ACTIONS.START_GUIDE, async (ctx) => {
-    await ctx.answerCbQuery();
-    await ctx.reply(
-      [
-        "برای شروع بسته جدید:",
-        "۱) عکس با کپشن را بفرست.",
-        "۲) فایل صوتی همراه کپشن را ارسال کن.",
-        "۳) ویس بفرست یا دکمه تبدیل آهنگ به ویس را بزن.",
-        "",
-        "پس از تکمیل بسته، دکمه‌های زمان‌بندی و ارسال فوری نمایش داده می‌شوند.",
-      ].join("\n")
-    );
   });
 
   // Fallback for any other message types
