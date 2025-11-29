@@ -7,6 +7,7 @@ const ChunkRepository = require('./repositories/chunkRepository');
 const Database = require('./infrastructure/sqlite');
 const { createRedisClient, RedisSessionStore } = require('./infrastructure/redis');
 const environment = require('./config/environment');
+const logger = require('./logger');
 
 async function createApp() {
   const config = environment.load();
@@ -27,9 +28,11 @@ async function createApp() {
 
   setInterval(() => {
     service.postDueScheduled().catch((error) => {
-      console.error('Error while posting scheduled chunks', error);
+      logger.error('Error while posting scheduled chunks', error);
     });
   }, 30 * 1000);
+
+  logger.info('Bot initialized', { redisUrl: config.redisUrl, databasePath: config.databasePath });
 
   return { bot, redis };
 }

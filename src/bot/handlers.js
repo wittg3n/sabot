@@ -2,6 +2,7 @@
 
 const { Markup } = require("telegraf");
 const path = require("path");
+const logger = require("../logger");
 
 const {
   convertToOgg,
@@ -54,6 +55,7 @@ function sendOrderError(ctx, service) {
 function registerChunkHandlers(bot, chunkService) {
   // /start
   bot.start((ctx) => {
+    logger.info("Received /start", { chatId: ctx.chat.id, user: ctx.from?.id });
     ctx.reply(
       [
         "سلام! 😊 خوش اومدی به *سابات*.",
@@ -69,7 +71,7 @@ function registerChunkHandlers(bot, chunkService) {
         "",
         "هر وقت آماده‌ای، با ارسال عکس شروع کن. ✨",
       ].join("\n"),
-      { parse_mode: "Markdown" }
+      { parse_mode: "Markdown", ...startKeyboard }
     );
   });
 
@@ -77,12 +79,14 @@ function registerChunkHandlers(bot, chunkService) {
   bot.command("cancel", (ctx) => {
     const chatId = ctx.chat.id;
     chunkService.resetChunk(ctx.session);
+    logger.info("Chunk canceled", { chatId });
     ctx.reply("بسته فعلی لغو شد. اگر خواستی دوباره شروع کنی، از عکس آغاز کن!");
   });
 
   // /post
   bot.command("post", async (ctx) => {
     const result = await chunkService.postChunk(ctx.chat.id, ctx.session);
+    logger.info("Manual post command invoked", { chatId: ctx.chat.id, success: result.success });
     ctx.reply(result.message);
   });
 
@@ -140,6 +144,7 @@ function registerChunkHandlers(bot, chunkService) {
     const largestPhoto = photoSizes[photoSizes.length - 1];
 
     chunkService.startChunk(ctx.session, largestPhoto, ctx.message.caption);
+    logger.info("Photo received", { chatId, fileId: largestPhoto.file_id });
     ctx.reply("عکس رسید! حالا فایل صوتی را همراه کپشن بفرست. 🎶");
   });
 
@@ -153,6 +158,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addAudio(ctx.session, ctx.message.audio, ctx.message.caption);
+    logger.info("Audio received", { chatId, fileId: ctx.message.audio.file_id });
     ctx.reply(
       "صدا رسید! میخوای همین آهنگو تبدیل به ویس کنم یا خودت ویس می‌فرستی؟",
       Markup.inlineKeyboard([
@@ -182,6 +188,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addVoice(ctx.session, ctx.message.voice, ctx.message.caption);
+    logger.info("Voice received", { chatId, fileId: ctx.message.voice.file_id });
     ctx.reply(
       "بسته آماده است! از دکمه‌های زیر برای ارسال فوری، زمان‌بندی یا لغو استفاده کن.",
       readyKeyboard
@@ -295,7 +302,7 @@ function registerChunkHandlers(bot, chunkService) {
         readyKeyboard
       );
     } catch (error) {
-      console.error("Failed to convert audio to voice", error);
+      logger.error("Failed to convert audio to voice", error);
       await ctx.reply("تبدیل آهنگ به ویس با خطا مواجه شد. لطفاً ویس را خودت بفرست.");
     }
   });
