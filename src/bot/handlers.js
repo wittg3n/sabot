@@ -15,13 +15,34 @@ const ACTIONS = {
   CANCEL: "chunk:cancel",
   CONVERT_AUDIO: "chunk:convert_audio",
   SKIP_CONVERT: "chunk:skip_convert",
+  VIEW_SCHEDULES: "chunk:view_schedules",
 };
 
 const readyKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback("ارسال فوری 🚀", ACTIONS.POST_NOW)],
   [Markup.button.callback("زمان‌بندی ⏰", ACTIONS.SCHEDULE)],
+  [Markup.button.callback("برنامه‌های پیش‌رو 🗓️", ACTIONS.VIEW_SCHEDULES)],
   [Markup.button.callback("لغو ❌", ACTIONS.CANCEL)],
 ]);
+
+function formatUpcomingSchedules(upcoming) {
+  if (!upcoming || upcoming.length === 0) {
+    return "upcoming schedules:\nفعلاً بسته زمان‌بندی‌شده‌ای در صف نیست.";
+  }
+
+  const lines = upcoming.map((item, index) => {
+    const time = new Date(item.scheduled_at).toLocaleString();
+    return `${index + 1}. ${time}`;
+  });
+
+  return ["upcoming schedules:", ...lines].join("\n");
+}
+
+async function replyWithUpcomingSchedules(ctx, chunkService) {
+  const upcoming = chunkService.getUpcomingSchedules(ctx.chat.id);
+  const message = formatUpcomingSchedules(upcoming);
+  await ctx.reply(message);
+}
 
 function sendOrderError(ctx, service) {
   service.resetChunk(ctx.session);
@@ -37,19 +58,16 @@ function registerChunkHandlers(bot, chunkService) {
       [
         "سلام! 😊 خوش اومدی به *سابات*.",
         "",
-        "این بات کمک می‌کنه خیلی راحت و منظم، محتوای سه‌قسمتی‌ت رو (عکس، آهنگ، ویس) آماده و برای کانال منتشر کنی.",
+        "اینجا می‌تونی محتوای سه‌مرحله‌ای خودت (عکس، آهنگ، ویس) رو بدون دردسر آماده و برای کانال منتشر کنی.",
         "",
-        "*برای ساخت یک چانک، فقط این مراحل رو انجام بده:*",
-        "1️⃣ ارسال *عکس + کپشن*",
-        "2️⃣ ارسال *فایل صوتی (Audio) + کپشن*",
-        "3️⃣ ارسال *ویس (Voice)*",
+        "*چطور کار می‌کنیم؟*",
+        "• عکس همراه کپشن را بفرست.",
+        "• فایل صوتی با کپشن را اضافه کن.",
+        "• ویس را ارسال کن یا اجازه بده آهنگت تبدیل به ویس شود.",
         "",
-        "بعد از کامل شدن چانک، می‌تونی:",
-        "• *همین الان منتشرش کنی*",
-        "• یا *زمان‌بندی* کنی تا اتوماتیک پست بشه",
+        "بعد از کامل شدن بسته، دکمه‌های مدیریت (ارسال فوری، زمان‌بندی و برنامه‌های پیش‌رو) ظاهر می‌شوند تا حرفه‌ای تصمیم بگیری.",
         "",
-        "",
-        "حالا میتونی یه چانک برام بفرستی ✨",
+        "هر وقت آماده‌ای، با ارسال عکس شروع کن. ✨",
       ].join("\n"),
       { parse_mode: "Markdown" }
     );
@@ -87,7 +105,7 @@ function registerChunkHandlers(bot, chunkService) {
 
       return ctx.reply(
         "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM وارد کن (ساعت اختیاری است). مثال: 17/02/2025 09:30"
-      );
+      ).then(() => replyWithUpcomingSchedules(ctx, chunkService));
     }
 
     // Mode 2: /schedule 28/11/2025 19:09
@@ -106,7 +124,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
-    return ctx.reply(result.message);
+    return ctx.reply(result.message).then(() => replyWithUpcomingSchedules(ctx, chunkService));
   });
 
   // Photo
@@ -165,7 +183,7 @@ function registerChunkHandlers(bot, chunkService) {
 
     chunkService.addVoice(ctx.session, ctx.message.voice, ctx.message.caption);
     ctx.reply(
-      "بسته آماده است! برای ارسال فوری /post را بفرست، برای زمان‌بندی با تاریخ /schedule DD/MM/YYYY HH:MM و برای وارد کردن تاریخ در پیام بعدی فقط /schedule را بفرست. برای لغو هم /cancel را بزن.",
+      "بسته آماده است! از دکمه‌های زیر برای ارسال فوری، زمان‌بندی یا لغو استفاده کن.",
       readyKeyboard
     );
   });
@@ -194,7 +212,7 @@ function registerChunkHandlers(bot, chunkService) {
     // We got a valid date → schedule and clear the pending state
     chunkService.clearScheduleRequest(ctx.session);
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
-    return ctx.reply(result.message);
+    return ctx.reply(result.message).then(() => replyWithUpcomingSchedules(ctx, chunkService));
   });
 
   bot.action(ACTIONS.POST_NOW, async (ctx) => {
@@ -220,6 +238,7 @@ function registerChunkHandlers(bot, chunkService) {
     await ctx.reply(
       "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM بفرست (ساعت اختیاری است). مثال: 17/02/2025 09:30"
     );
+    await replyWithUpcomingSchedules(ctx, chunkService);
   });
 
   bot.action(ACTIONS.CANCEL, async (ctx) => {
@@ -272,13 +291,18 @@ function registerChunkHandlers(bot, chunkService) {
       );
 
       await ctx.reply(
-        "ویس آماده شد! برای ارسال فوری /post را بفرست یا برای زمان‌بندی /schedule را ارسال کن.",
+        "ویس آماده شد! از دکمه‌های زیر برای ارسال فوری یا زمان‌بندی استفاده کن.",
         readyKeyboard
       );
     } catch (error) {
       console.error("Failed to convert audio to voice", error);
       await ctx.reply("تبدیل آهنگ به ویس با خطا مواجه شد. لطفاً ویس را خودت بفرست.");
     }
+  });
+
+  bot.action(ACTIONS.VIEW_SCHEDULES, async (ctx) => {
+    await ctx.answerCbQuery();
+    await replyWithUpcomingSchedules(ctx, chunkService);
   });
 
   // Fallback for any other message types
