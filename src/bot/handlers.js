@@ -1,8 +1,8 @@
 "use strict";
 
 const { Markup } = require("telegraf");
-const fs = require("fs");
 const path = require("path");
+const logger = require("../logger");
 
 const {
   convertToOgg,
@@ -16,39 +16,37 @@ const ACTIONS = {
   CANCEL: "chunk:cancel",
   CONVERT_AUDIO: "chunk:convert_audio",
   SKIP_CONVERT: "chunk:skip_convert",
-  SCHEDULE_IN_1H: "chunk:schedule_in_1h",
-  SCHEDULE_TOMORROW: "chunk:schedule_tomorrow",
-  SCHEDULE_DAY_AFTER: "chunk:schedule_day_after",
-  SCHEDULE_IN_2DAYS: "chunk:schedule_in_2days",
-  SCHEDULE_NEXT_WEEK: "chunk:schedule_next_week",
-  SCHEDULE_CUSTOM: "chunk:schedule_custom",
+  VIEW_SCHEDULES: "chunk:view_schedules",
 };
+var date=new Date();
+date.setHours(date.getHours()+3);
+date.setMinutes(date.getMinutes()+30);
+
 
 const readyKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback("ارسال فوری 🚀", ACTIONS.POST_NOW)],
   [Markup.button.callback("زمان‌بندی ⏰", ACTIONS.SCHEDULE)],
+  [Markup.button.callback("برنامه‌های پیش‌رو 🗓️", ACTIONS.VIEW_SCHEDULES)],
   [Markup.button.callback("لغو ❌", ACTIONS.CANCEL)],
 ]);
 
-const scheduleOptionsKeyboard = Markup.inlineKeyboard([
-  [Markup.button.callback("یک ساعت دیگه", ACTIONS.SCHEDULE_IN_1H)],
-  [Markup.button.callback("فردا", ACTIONS.SCHEDULE_TOMORROW)],
-  [Markup.button.callback("پسفردا", ACTIONS.SCHEDULE_DAY_AFTER)],
-  [Markup.button.callback("2 روز دیگه", ACTIONS.SCHEDULE_IN_2DAYS)],
-  [Markup.button.callback("هفته دیگه", ACTIONS.SCHEDULE_NEXT_WEEK)],
-  [Markup.button.callback("خودت انتخاب کن", ACTIONS.SCHEDULE_CUSTOM)],
-]);
-
-async function safeRemove(filePath) {
-  if (!filePath) return;
-
-  try {
-    await fs.promises.unlink(filePath);
-  } catch (error) {
-    if (error?.code !== "ENOENT") {
-      console.error(`Failed to remove file ${filePath}:`, error);
-    }
+function formatUpcomingSchedules(upcoming) {
+  if (!upcoming || upcoming.length === 0) {
+    return "upcoming schedules:\nفعلاً بسته زمان‌بندی‌شده‌ای در صف نیست.";
   }
+
+  const lines = upcoming.map((item, index) => {
+    const time = new Date(item.scheduled_at).toLocaleString();
+    return `${index + 1}. ${time}`;
+  });
+
+  return ["upcoming schedules:", ...lines].join("\n");
+}
+
+async function replyWithUpcomingSchedules(ctx, chunkService) {
+  const upcoming = chunkService.getUpcomingSchedules(ctx.chat.id);
+  const message = formatUpcomingSchedules(upcoming);
+  await ctx.reply(message);
 }
 
 function sendOrderError(ctx, service) {
@@ -93,39 +91,39 @@ async function handleQuickSchedule(ctx, chunkService, scheduledAt) {
 
 function registerChunkHandlers(bot, chunkService) {
   // /start
-  bot.start((ctx) => {
-    ctx.reply(
-      [
-        "سلام! 😊 خوش اومدی به *سابات*.",
-        "",
-        "این بات کمک می‌کنه خیلی راحت و منظم، محتوای سه‌قسمتی‌ت رو (عکس، آهنگ، ویس) آماده و برای کانال منتشر کنی.",
-        "",
-        "*برای ساخت یک چانک، فقط این مراحل رو انجام بده:*",
-        "1️⃣ ارسال *عکس + کپشن*",
-        "2️⃣ ارسال *فایل صوتی (Audio) + کپشن*",
-        "3️⃣ ارسال *ویس (Voice)*",
-        "",
-        "بعد از کامل شدن چانک، می‌تونی:",
-        "• *همین الان منتشرش کنی*",
-        "• یا *زمان‌بندی* کنی تا اتوماتیک پست بشه",
-        "",
-        "",
-        "حالا میتونی یه چانک برام بفرستی ✨",
-      ].join("\n"),
-      { parse_mode: "Markdown" }
-    );
-  });
+bot.start((ctx) => {
+  logger.info("Received /start", { chatId: ctx.chat.id, user: ctx.from?.id });
+  ctx.reply(
+    [
+      "سلام! 😊 خوش اومدی به *سابات*.",
+      "",
+      "اینجا می‌تونی محتوای سه‌مرحله‌ای خودت (عکس، آهنگ، ویس) رو بدون دردسر آماده و برای کانال منتشر کنی.",
+      "",
+      "*چطور کار می‌کنیم؟*",
+      "• عکس همراه کپشن را بفرست.",
+      "• فایل صوتی با کپشن را اضافه کن.",
+      "• ویس را ارسال کن یا اجازه بده آهنگت تبدیل به ویس شود.",
+      "",
+      "بعد از کامل شدن بسته، دکمه‌های مدیریت (ارسال فوری، زمان‌بندی و برنامه‌های پیش‌رو) ظاهر می‌شوند تا حرفه‌ای تصمیم بگیری.",
+      "",
+      "هر وقت آماده‌ای، با ارسال عکس شروع کن. ✨",
+    ].join("\n"),
+    { parse_mode: "Markdown" }
+  );
+});
 
   // /cancel
   bot.command("cancel", (ctx) => {
     const chatId = ctx.chat.id;
     chunkService.resetChunk(ctx.session);
+    logger.info("Chunk canceled", { chatId });
     ctx.reply("بسته فعلی لغو شد. اگر خواستی دوباره شروع کنی، از عکس آغاز کن!");
   });
 
   // /post
   bot.command("post", async (ctx) => {
     const result = await chunkService.postChunk(ctx.chat.id, ctx.session);
+    logger.info("Manual post command invoked", { chatId: ctx.chat.id, success: result.success });
     ctx.reply(result.message);
   });
 
@@ -147,10 +145,8 @@ function registerChunkHandlers(bot, chunkService) {
       chunkService.requestScheduleInput(ctx.session);
 
       return ctx.reply(
-        "یکی از گزینه‌های زیر را انتخاب کن یا تاریخ و ساعت را دستی وارد کن. قالب: DD/MM/YYYY HH:MM\n" +
-          "مثال: 17/02/2025 09:30",
-        scheduleOptionsKeyboard
-      );
+        "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM وارد کن (ساعت اختیاری است). مثال: 17/02/2025 09:30"
+      ).then(() => replyWithUpcomingSchedules(ctx, chunkService));
     }
 
     // Mode 2: /schedule 28/11/2025 19:09
@@ -169,7 +165,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
-    return ctx.reply(result.message);
+    return ctx.reply(result.message).then(() => replyWithUpcomingSchedules(ctx, chunkService));
   });
 
   // Photo
@@ -185,6 +181,7 @@ function registerChunkHandlers(bot, chunkService) {
     const largestPhoto = photoSizes[photoSizes.length - 1];
 
     chunkService.startChunk(ctx.session, largestPhoto, ctx.message.caption);
+    logger.info("Photo received", { chatId, fileId: largestPhoto.file_id });
     ctx.reply("عکس رسید! حالا فایل صوتی را همراه کپشن بفرست. 🎶");
   });
 
@@ -198,6 +195,7 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addAudio(ctx.session, ctx.message.audio, ctx.message.caption);
+    logger.info("Audio received", { chatId, fileId: ctx.message.audio.file_id });
     ctx.reply(
       "صدا رسید! میخوای همین آهنگو تبدیل به ویس کنم یا خودت ویس می‌فرستی؟",
       Markup.inlineKeyboard([
@@ -227,8 +225,9 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addVoice(ctx.session, ctx.message.voice, ctx.message.caption);
+    logger.info("Voice received", { chatId, fileId: ctx.message.voice.file_id });
     ctx.reply(
-      "بسته آماده است! برای ارسال فوری /post را بفرست، برای زمان‌بندی با تاریخ /schedule DD/MM/YYYY HH:MM و برای وارد کردن تاریخ در پیام بعدی فقط /schedule را بفرست. برای لغو هم /cancel را بزن.",
+      "بسته آماده است! از دکمه‌های زیر برای ارسال فوری، زمان‌بندی یا لغو استفاده کن.",
       readyKeyboard
     );
   });
@@ -257,7 +256,7 @@ function registerChunkHandlers(bot, chunkService) {
     // We got a valid date → schedule and clear the pending state
     chunkService.clearScheduleRequest(ctx.session);
     const result = chunkService.scheduleChunk(chatId, ctx.session, scheduledAt);
-    return ctx.reply(result.message);
+    return ctx.reply(result.message).then(() => replyWithUpcomingSchedules(ctx, chunkService));
   });
 
   bot.action(ACTIONS.POST_NOW, async (ctx) => {
@@ -277,63 +276,14 @@ function registerChunkHandlers(bot, chunkService) {
       });
       return;
     }
-
+const now = new Date();
+ const serverTimeText = `⏰ زمان فعلی سرور (هلند): ${now.toLocaleString()}`;
     chunkService.requestScheduleInput(ctx.session);
     await ctx.answerCbQuery();
     await ctx.reply(
-      "یکی از گزینه‌های زیر را انتخاب کن یا تاریخ و ساعت را دستی وارد کن. قالب: DD/MM/YYYY HH:MM\n" +
-        "مثال: 17/02/2025 09:30",
-      scheduleOptionsKeyboard
+      "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM بفرست (ساعت اختیاری است). مثال: 17/02/2025 09:30" + "\n" + serverTimeText
     );
-  });
-
-  bot.action(ACTIONS.SCHEDULE_IN_1H, async (ctx) => {
-    const now = new Date();
-    const scheduledAt = new Date(now.getTime() + 60 * 60 * 1000);
-    await handleQuickSchedule(ctx, chunkService, scheduledAt);
-  });
-
-  bot.action(ACTIONS.SCHEDULE_TOMORROW, async (ctx) => {
-    const now = new Date();
-    const scheduledAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-    await handleQuickSchedule(ctx, chunkService, scheduledAt);
-  });
-
-  bot.action(ACTIONS.SCHEDULE_DAY_AFTER, async (ctx) => {
-    const now = new Date();
-    const scheduledAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    await handleQuickSchedule(ctx, chunkService, scheduledAt);
-  });
-
-  bot.action(ACTIONS.SCHEDULE_IN_2DAYS, async (ctx) => {
-    const now = new Date();
-    const scheduledAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
-    await handleQuickSchedule(ctx, chunkService, scheduledAt);
-  });
-
-  bot.action(ACTIONS.SCHEDULE_NEXT_WEEK, async (ctx) => {
-    const now = new Date();
-    const scheduledAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    await handleQuickSchedule(ctx, chunkService, scheduledAt);
-  });
-
-  bot.action(ACTIONS.SCHEDULE_CUSTOM, async (ctx) => {
-    const chunk = chunkService.getChunk(ctx.session);
-
-    if (!chunk || chunk.step !== 3) {
-      await ctx.answerCbQuery("بسته کامل نیست.", { show_alert: true });
-      return;
-    }
-
-    chunkService.requestScheduleInput(ctx.session);
-    await ctx.answerCbQuery();
-
-    const serverTimeText = formatServerTime();
-    await ctx.reply(
-      "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM بفرست (ساعت اختیاری است). مثال: 17/02/2025 09:30" +
-        "\n" +
-        serverTimeText
-    );
+    await replyWithUpcomingSchedules(ctx, chunkService);
   });
 
   bot.action(ACTIONS.CANCEL, async (ctx) => {
@@ -364,14 +314,11 @@ function registerChunkHandlers(bot, chunkService) {
 
     await ctx.answerCbQuery();
 
-    let audioPath;
-    let oggPath;
-
     try {
       const telegramId = ctx.from.id;
-      audioPath = await downloadFile(chunk.audio_file_id, telegramId);
+      const audioPath = await downloadFile(chunk.audio_file_id, telegramId);
       const duration = await getAudioDuration(audioPath);
-      oggPath = path.join(
+      const oggPath = path.join(
         __dirname,
         "../../userdata",
         `${telegramId}`,
@@ -389,16 +336,18 @@ function registerChunkHandlers(bot, chunkService) {
       );
 
       await ctx.reply(
-        "ویس آماده شد! برای ارسال فوری /post را بفرست یا برای زمان‌بندی /schedule را ارسال کن.",
+        "ویس آماده شد! از دکمه‌های زیر برای ارسال فوری یا زمان‌بندی استفاده کن.",
         readyKeyboard
       );
     } catch (error) {
-      console.error("Failed to convert audio to voice", error);
+      logger.error("Failed to convert audio to voice", error);
       await ctx.reply("تبدیل آهنگ به ویس با خطا مواجه شد. لطفاً ویس را خودت بفرست.");
-    } finally {
-      await safeRemove(oggPath);
-      await safeRemove(audioPath);
     }
+  });
+
+  bot.action(ACTIONS.VIEW_SCHEDULES, async (ctx) => {
+    await ctx.answerCbQuery();
+    await replyWithUpcomingSchedules(ctx, chunkService);
   });
 
   // Fallback for any other message types
