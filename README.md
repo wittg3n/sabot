@@ -30,6 +30,11 @@ Install the following before running the bot:
 
 ## 🧭 Quickstart
 
+> **Note:** The project repository was renamed to **sabot** (from `kiagram`). If you cloned the old remote, update it with:
+> ```bash
+> git remote set-url origin https://github.com/your-username/sabot.git
+> ```
+
 1. **Clone & install**
 
    ```bash
