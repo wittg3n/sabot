@@ -1,6 +1,44 @@
 "use strict";
 
+const fs = require("fs");
+const path = require("path");
 const logger = require("../logger");
+
+// حذف فایل‌های مربوط به یک آهنگ/ویس کاربر
+function deleteUserFiles(telegramId, audioFileId) {
+  if (!telegramId || !audioFileId) {
+    return;
+  }
+
+  const baseDir = path.join(__dirname, "../../userdata", String(telegramId));
+
+  const mp3Path = path.join(baseDir, `${audioFileId}.mp3`);
+  const oggPath = path.join(baseDir, `${audioFileId}.ogg`);
+
+  try {
+    if (fs.existsSync(mp3Path)) {
+      fs.unlinkSync(mp3Path);
+    }
+  } catch (err) {
+    logger.warn("Failed to delete mp3 file", {
+      telegramId,
+      audioFileId,
+      error: err.message,
+    });
+  }
+
+  try {
+    if (fs.existsSync(oggPath)) {
+      fs.unlinkSync(oggPath);
+    }
+  } catch (err) {
+    logger.warn("Failed to delete ogg file", {
+      telegramId,
+      audioFileId,
+      error: err.message,
+    });
+  }
+}
 
 class ChunkService {
   constructor({ repository, bot, channelId }) {
@@ -19,7 +57,7 @@ class ChunkService {
     session.chunk = {
       step: 1,
       photo_file_id: photo.file_id,
-      photo_caption: caption || '',
+      photo_caption: caption || "",
     };
     this.clearScheduleRequest(session);
   }
@@ -31,7 +69,7 @@ class ChunkService {
       ...session.chunk,
       step: 2,
       audio_file_id: audio.file_id,
-      audio_caption: caption || '',
+      audio_caption: caption || "",
     };
   }
 
@@ -42,7 +80,7 @@ class ChunkService {
       ...session.chunk,
       step: 3,
       voice_file_id: voice.file_id,
-      voice_caption: caption || '',
+      voice_caption: caption || "",
     };
   }
 
@@ -130,6 +168,18 @@ class ChunkService {
 
     try {
       await this.sendChunkToChannel(chunk);
+
+      // پاک کردن فایل‌های mp3 و ogg مربوط به این آهنگ/ویس
+      try {
+        const telegramId = chatId; // در چت خصوصی، chat_id همان تلگرام آیدی کاربر است
+        deleteUserFiles(telegramId, chunk.audio_file_id);
+      } catch (cleanupError) {
+        logger.warn("Failed to cleanup files after immediate post", {
+          chatId,
+          error: cleanupError.message,
+        });
+      }
+
       this.resetChunk(session);
       return { success: true, message: "در کانال ارسال شد ✅" };
     } catch (error) {
@@ -141,6 +191,10 @@ class ChunkService {
     }
   }
 
+  /**
+   * زمان‌بندی یک بسته؛ علاوه بر پیام، id رکورد زمان‌بندی‌شده را برمی‌گرداند
+   * تا در inline keyboard برای لغو استفاده شود.
+   */
   scheduleChunk(chatId, session, scheduledAt) {
     const chunk = this.getChunk(session);
 
@@ -152,14 +206,79 @@ class ChunkService {
       };
     }
 
-    this.repository.schedule(chatId, chunk, scheduledAt);
-    logger.info("Chunk scheduled", { chatId, scheduledAt: scheduledAt.toISOString() });
+    const scheduledId = this.repository.schedule(chatId, chunk, scheduledAt);
+    logger.info("Chunk scheduled", {
+      chatId,
+      scheduledAt: scheduledAt.toISOString(),
+      scheduledId,
+    });
+
     this.resetChunk(session);
 
     return {
       success: true,
       message: `بسته برای ${scheduledAt.toLocaleString()} زمان‌بندی شد.`,
+      scheduledId,
     };
+  }
+
+  /**
+   * لغو یک زمان‌بندی بر اساس id (فقط اگر متعلق به همان chat باشد)
+   */
+  cancelScheduled(chatId, scheduledId) {
+    try {
+      const scheduled = this.repository.getScheduledById(scheduledId);
+
+      if (!scheduled) {
+        return {
+          success: false,
+          message: "این برنامه زمان‌بندی پیدا نشد یا قبلاً حذف شده است.",
+        };
+      }
+
+      if (String(scheduled.chat_id) !== String(chatId)) {
+        return {
+          success: false,
+          message: "شما اجازه لغو این زمان‌بندی را ندارید.",
+        };
+      }
+
+      // پاک کردن فایل‌های mp3 و ogg مربوط به این برنامه
+      try {
+        const telegramId = scheduled.chat_id;
+        deleteUserFiles(telegramId, scheduled.audio_file_id);
+      } catch (cleanupError) {
+        logger.warn("Failed to cleanup files after canceling scheduled post", {
+          chatId,
+          scheduledId,
+          error: cleanupError.message,
+        });
+      }
+
+      this.repository.removeScheduled(scheduledId);
+
+      const timeText = new Date(scheduled.scheduled_at).toLocaleString();
+
+      logger.info("Scheduled chunk canceled by user", {
+        chatId,
+        scheduledId,
+        time: timeText,
+      });
+
+      return {
+        success: true,
+        message: `بسته زمان‌بندی‌شده برای ${timeText} لغو شد.`,
+      };
+    } catch (error) {
+      logger.error("Failed to cancel scheduled chunk", error, {
+        chatId,
+        scheduledId,
+      });
+      return {
+        success: false,
+        message: "لغو زمان‌بندی با خطا مواجه شد. لطفاً دوباره تلاش کن.",
+      };
+    }
   }
 
   async postDueScheduled() {
@@ -169,6 +288,19 @@ class ChunkService {
     for (const scheduled of dueChunks) {
       try {
         await this.sendChunkToChannel(scheduled);
+
+        // پاک کردن فایل‌های mp3 و ogg مربوط به این آهنگ/ویس
+        try {
+          const telegramId = scheduled.chat_id;
+          deleteUserFiles(telegramId, scheduled.audio_file_id);
+        } catch (cleanupError) {
+          logger.warn("Failed to cleanup files after scheduled post", {
+            chatId: scheduled.chat_id,
+            scheduledId: scheduled.id,
+            error: cleanupError.message,
+          });
+        }
+
         this.repository.removeScheduled(scheduled.id);
 
         await this.bot.telegram.sendMessage(
@@ -176,7 +308,9 @@ class ChunkService {
           `بسته زمان‌بندی‌شده در ${new Date().toLocaleString()} در کانال ارسال شد.`
         );
       } catch (error) {
-        logger.error("Failed to post scheduled chunk", error, { scheduledId: scheduled.id });
+        logger.error("Failed to post scheduled chunk", error, {
+          scheduledId: scheduled.id,
+        });
 
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,

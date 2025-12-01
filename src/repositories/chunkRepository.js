@@ -1,4 +1,4 @@
-'use strict';
+"use strict";
 
 const createTables = `
   CREATE TABLE IF NOT EXISTS chunks (
@@ -32,7 +32,9 @@ class ChunkRepository {
   }
 
   getByChatId(chatId) {
-    return this.db.prepare('SELECT * FROM chunks WHERE chat_id = ?').get(chatId);
+    return this.db
+      .prepare("SELECT * FROM chunks WHERE chat_id = ?")
+      .get(chatId);
   }
 
   startChunk(chatId, photoId, caption) {
@@ -49,7 +51,7 @@ class ChunkRepository {
           voice_caption
         ) VALUES (?, 1, ?, ?, NULL, NULL, NULL, NULL)`
       )
-      .run(chatId, photoId, caption || '');
+      .run(chatId, photoId, caption || "");
   }
 
   addAudio(chatId, audioId, caption) {
@@ -61,7 +63,7 @@ class ChunkRepository {
           audio_caption = ?
         WHERE chat_id = ?`
       )
-      .run(audioId, caption || '', chatId);
+      .run(audioId, caption || "", chatId);
   }
 
   addVoice(chatId, voiceId, caption) {
@@ -73,14 +75,19 @@ class ChunkRepository {
           voice_caption = ?
         WHERE chat_id = ?`
       )
-      .run(voiceId, caption || '', chatId);
+      .run(voiceId, caption || "", chatId);
   }
 
   reset(chatId) {
-    this.db.prepare('DELETE FROM chunks WHERE chat_id = ?').run(chatId);
+    this.db.prepare("DELETE FROM chunks WHERE chat_id = ?").run(chatId);
   }
 
+  /**
+   * یک بسته را در جدول زمان‌بندی ذخیره می‌کند و id رکورد ایجادشده را برمی‌گرداند.
+   */
   schedule(chatId, chunk, scheduledAt) {
+    const scheduledTs = scheduledAt.getTime();
+
     this.db
       .prepare(
         `INSERT INTO scheduled_chunks (
@@ -96,32 +103,65 @@ class ChunkRepository {
       )
       .run(
         chatId,
-        scheduledAt.getTime(),
+        scheduledTs,
         chunk.photo_file_id,
         chunk.photo_caption,
         chunk.audio_file_id,
         chunk.audio_caption,
         chunk.voice_file_id,
-        chunk.voice_caption,
+        chunk.voice_caption
       );
+
+    // چون هر query یک پروسه‌ی sqlite جداست، با ترکیب فیلدها id را برمی‌داریم
+    const row = this.db
+      .prepare(
+        `SELECT id FROM scheduled_chunks
+         WHERE chat_id = ?
+           AND scheduled_at = ?
+           AND photo_file_id = ?
+           AND audio_file_id = ?
+           AND voice_file_id = ?
+         ORDER BY id DESC
+         LIMIT 1`
+      )
+      .get(
+        chatId,
+        scheduledTs,
+        chunk.photo_file_id,
+        chunk.audio_file_id,
+        chunk.voice_file_id
+      );
+
+    return row ? row.id : null;
   }
 
   fetchDue(now) {
     return this.db
-      .prepare('SELECT * FROM scheduled_chunks WHERE scheduled_at <= ? ORDER BY scheduled_at ASC')
+      .prepare(
+        "SELECT * FROM scheduled_chunks WHERE scheduled_at <= ? ORDER BY scheduled_at ASC"
+      )
       .all(now.getTime());
   }
 
   fetchUpcomingByChatId(chatId, now = new Date()) {
     return this.db
       .prepare(
-        'SELECT * FROM scheduled_chunks WHERE chat_id = ? AND scheduled_at > ? ORDER BY scheduled_at ASC'
+        "SELECT * FROM scheduled_chunks WHERE chat_id = ? AND scheduled_at > ? ORDER BY scheduled_at ASC"
       )
       .all(chatId, now.getTime());
   }
 
   removeScheduled(id) {
-    this.db.prepare('DELETE FROM scheduled_chunks WHERE id = ?').run(id);
+    this.db.prepare("DELETE FROM scheduled_chunks WHERE id = ?").run(id);
+  }
+
+  /**
+   * گرفتن یک برنامه زمان‌بندی‌شده بر اساس id
+   */
+  getScheduledById(id) {
+    return this.db
+      .prepare("SELECT * FROM scheduled_chunks WHERE id = ?")
+      .get(id);
   }
 }
 

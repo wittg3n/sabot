@@ -2,15 +2,18 @@ const fs = require("fs");
 const path = require("path");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
+const ffmpeg = require("fluent-ffmpeg");
 
 const execFileAsync = promisify(execFile);
 
+// محاسبه مدت آهنگ با ffprobe
 const getAudioDuration = async (filePath) => {
+  // مطمئن شو فایل وجود داره
   await fs.promises.access(filePath, fs.constants.F_OK);
 
   const { stdout } = await execFileAsync("ffprobe", [
     "-v",
-    "error",
+    "error", // این فقط یک بار باید باشه
     "-show_entries",
     "format=duration",
     "-of",
@@ -19,19 +22,20 @@ const getAudioDuration = async (filePath) => {
   ]);
 
   const duration = parseFloat(stdout.trim());
-
   if (!Number.isFinite(duration)) {
-    throw new Error(`Could not determine duration for file: ${filePath}`);
+    throw new Error("duration error");
   }
 
   return duration;
 };
+
+// تنظیمات اجباری برای voice تلگرام (waveform)
 const forcedStartTime = 0;
-const forcedDuration = 30;
+const forcedDuration = 61;
+
+// تبدیل mp3 به OGG (voice) به فرمتی که تلگرام waveform نشون بده
 const convertToOgg = async (inputFile, outputFile) => {
-  await fs.promises.access(inputFile, fs.constants.F_OK).catch(() => {
-    throw new Error(`Input file does not exist: ${inputFile}`);
-  });
+  await fs.promises.access(inputFile, fs.constants.F_OK);
 
   const outputDir = path.dirname(outputFile);
   await fs.promises.mkdir(outputDir, { recursive: true });
@@ -40,13 +44,20 @@ const convertToOgg = async (inputFile, outputFile) => {
     ffmpeg(inputFile)
       .setStartTime(forcedStartTime)
       .duration(forcedDuration)
+      .noVideo()
       .audioCodec("libopus")
-      .audioBitrate("25k")
-      .audioFrequency(48000)
       .audioChannels(1)
-      .outputOptions(["-y"])
+      .audioBitrate("32k")
+      .audioFilters("aformat=sample_rates=48000") // مهم برای waveform
+      .outputOptions([
+        "-y",
+        "-map_metadata",
+        "-1", // حذف metadata
+        "-write_xing",
+        "0", // ضروری برای voice
+      ])
       .on("end", () => resolve(outputFile))
-      .on("error", (err) => reject(err))
+      .on("error", reject)
       .save(outputFile);
   });
 };
