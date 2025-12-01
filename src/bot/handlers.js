@@ -475,7 +475,7 @@ function registerChunkHandlers(bot, chunkService) {
       chunkService.addVoice(
         ctx.session,
         { file_id: result.result.voice.file_id },
-        chunk.audio_caption
+        ""
       );
       logger.info("Audio converted to voice and added to chunk", {
         chatId: ctx.chat.id,
