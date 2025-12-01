@@ -42,16 +42,11 @@ const convertToOgg = async (inputFile, outputFile) => {
       .duration(forcedDuration)
       .audioCodec("libopus")
       .audioBitrate("25k")
-      .audioFilters("aformat=sample_rates=48000")
+      .audioFrequency(48000)
       .audioChannels(1)
-      .on("end", () => {
-        console.log(`Conversion finished successfully: ${outputFile}`);
-        resolve(outputFile);
-      })
-      .on("error", (error) => {
-        console.error("Error occurred during conversion:", error);
-        reject(error);
-      })
+      .outputOptions(["-y"])
+      .on("end", () => resolve(outputFile))
+      .on("error", (err) => reject(err))
       .save(outputFile);
   });
 };
