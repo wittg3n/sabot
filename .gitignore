@@ -42,7 +42,7 @@ Thumbs.db
 # IDE settings
 .vscode/
 .idea/
-
+userdata/
 # TypeScript (if used)
 *.tsbuildinfo
 data.sqlite

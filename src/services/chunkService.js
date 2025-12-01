@@ -1,5 +1,7 @@
 "use strict";
 
+const logger = require("../logger");
+
 class ChunkService {
   constructor({ repository, bot, channelId }) {
     this.repository = repository;
@@ -61,6 +63,12 @@ class ChunkService {
 
   clearScheduleRequest(session) {
     session.waitingForSchedule = false;
+  }
+
+  // ----- upcoming schedules -----
+
+  getUpcomingSchedules(chatId, now = new Date()) {
+    return this.repository.fetchUpcomingByChatId(chatId, now);
   }
 
   // ----- parsing / validation -----
@@ -125,7 +133,7 @@ class ChunkService {
       this.resetChunk(session);
       return { success: true, message: "در کانال ارسال شد ✅" };
     } catch (error) {
-      console.error("Failed to post chunk", error);
+      logger.error("Failed to post chunk", error);
       return {
         success: false,
         message: "ارسال به کانال ناموفق بود. لطفاً دوباره تلاش کن.",
@@ -145,6 +153,7 @@ class ChunkService {
     }
 
     this.repository.schedule(chatId, chunk, scheduledAt);
+    logger.info("Chunk scheduled", { chatId, scheduledAt: scheduledAt.toISOString() });
     this.resetChunk(session);
 
     return {
@@ -167,7 +176,7 @@ class ChunkService {
           `بسته زمان‌بندی‌شده در ${new Date().toLocaleString()} در کانال ارسال شد.`
         );
       } catch (error) {
-        console.error("Failed to post scheduled chunk", error);
+        logger.error("Failed to post scheduled chunk", error, { scheduledId: scheduled.id });
 
         await this.bot.telegram.sendMessage(
           scheduled.chat_id,
