@@ -1,17 +1,30 @@
 const fs = require("fs");
-const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
+const { execFile } = require("child_process");
+const { promisify } = require("util");
 
-const getAudioDuration = (filePath) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) {
-        return reject(err);
-      }
-      const duration = metadata.format.duration;
-      resolve(duration);
-    });
-  });
+const execFileAsync = promisify(execFile);
+
+const getAudioDuration = async (filePath) => {
+  await fs.promises.access(filePath, fs.constants.F_OK);
+
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v",
+    "error",
+    "-show_entries",
+    "format=duration",
+    "-of",
+    "default=noprint_wrappers=1:nokey=1",
+    filePath,
+  ]);
+
+  const duration = parseFloat(stdout.trim());
+
+  if (!Number.isFinite(duration)) {
+    throw new Error(`Could not determine duration for file: ${filePath}`);
+  }
+
+  return duration;
 };
 const forcedStartTime = 0;
 const forcedDuration = 30;

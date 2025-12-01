@@ -1,4 +1,3 @@
-const axios = require("axios");
 const fs = require("fs");
 
 const sendVoiceMessage = async (telegramId, oggFilePath) => {
@@ -8,10 +7,16 @@ const sendVoiceMessage = async (telegramId, oggFilePath) => {
     voice: fs.createReadStream(oggFilePath),
   };
 
-  await axios.post(url, formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+  formData.append("chat_id", telegramId);
+  formData.append("voice", fs.createReadStream(oggFilePath));
+
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
   });
+
+  if (!response.ok) {
+    throw new Error(`Failed to send voice message: ${response.statusText}`);
+  }
 };
 module.exports = sendVoiceMessage;

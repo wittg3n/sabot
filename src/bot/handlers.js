@@ -56,6 +56,39 @@ function sendOrderError(ctx, service) {
   );
 }
 
+function formatServerTime() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+
+  const date = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  return `زمان سرور الان: ${date} ${time}`;
+}
+
+async function handleQuickSchedule(ctx, chunkService, scheduledAt) {
+  const chunk = chunkService.getChunk(ctx.session);
+
+  if (!chunk || chunk.step !== 3) {
+    await ctx.answerCbQuery("بسته کامل نیست.", { show_alert: true });
+    return;
+  }
+
+  if (!scheduledAt || !(scheduledAt instanceof Date) || Number.isNaN(scheduledAt.getTime())) {
+    await ctx.answerCbQuery("زمان نامعتبر است.", { show_alert: true });
+    return;
+  }
+
+  if (scheduledAt <= new Date()) {
+    await ctx.answerCbQuery("زمان باید در آینده باشد.", { show_alert: true });
+    return;
+  }
+
+  const result = chunkService.scheduleChunk(ctx.chat.id, ctx.session, scheduledAt);
+  await ctx.answerCbQuery();
+  await ctx.reply(result.message);
+}
+
 function registerChunkHandlers(bot, chunkService) {
   // /start
 bot.start((ctx) => {
