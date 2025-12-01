@@ -1,6 +1,6 @@
-'use strict';
+"use strict";
 
-require('dotenv').config();
+require("dotenv").config();
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -13,10 +13,10 @@ function getRequiredEnv(name) {
 module.exports = {
   load() {
     return {
-      botToken: getRequiredEnv('BOT_TOKEN'),
-      channelId: getRequiredEnv('CHANNEL_ID'),
-      databasePath: process.env.DATABASE_PATH || 'data.sqlite',
-      redisUrl: process.env.REDIS_URL || 'redis://localhost:6379',
+      botToken: getRequiredEnv("BOT_TOKEN"),
+      channelId: getRequiredEnv("CHANNEL_ID"),
+      databasePath: process.env.DATABASE_PATH,
+      redisUrl: process.env.REDIS_URL,
     };
   },
 };
