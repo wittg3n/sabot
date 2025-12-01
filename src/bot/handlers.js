@@ -1,11 +1,27 @@
 "use strict";
 
 const { Markup } = require("telegraf");
+const fs = require("fs");
+const path = require("path");
+
+const {
+  convertToOgg,
+  getAudioDuration,
+} = require("../services/musicConverterService");
+const { downloadFile } = require("../services/musicDownloaderService");
 
 const ACTIONS = {
   POST_NOW: "chunk:post_now",
   SCHEDULE: "chunk:schedule",
   CANCEL: "chunk:cancel",
+  CONVERT_AUDIO: "chunk:convert_audio",
+  SKIP_CONVERT: "chunk:skip_convert",
+  SCHEDULE_IN_1H: "chunk:schedule_in_1h",
+  SCHEDULE_TOMORROW: "chunk:schedule_tomorrow",
+  SCHEDULE_DAY_AFTER: "chunk:schedule_day_after",
+  SCHEDULE_IN_2DAYS: "chunk:schedule_in_2days",
+  SCHEDULE_NEXT_WEEK: "chunk:schedule_next_week",
+  SCHEDULE_CUSTOM: "chunk:schedule_custom",
 };
 
 const readyKeyboard = Markup.inlineKeyboard([
@@ -14,11 +30,65 @@ const readyKeyboard = Markup.inlineKeyboard([
   [Markup.button.callback("لغو ❌", ACTIONS.CANCEL)],
 ]);
 
+const scheduleOptionsKeyboard = Markup.inlineKeyboard([
+  [Markup.button.callback("یک ساعت دیگه", ACTIONS.SCHEDULE_IN_1H)],
+  [Markup.button.callback("فردا", ACTIONS.SCHEDULE_TOMORROW)],
+  [Markup.button.callback("پسفردا", ACTIONS.SCHEDULE_DAY_AFTER)],
+  [Markup.button.callback("2 روز دیگه", ACTIONS.SCHEDULE_IN_2DAYS)],
+  [Markup.button.callback("هفته دیگه", ACTIONS.SCHEDULE_NEXT_WEEK)],
+  [Markup.button.callback("خودت انتخاب کن", ACTIONS.SCHEDULE_CUSTOM)],
+]);
+
+async function safeRemove(filePath) {
+  if (!filePath) return;
+
+  try {
+    await fs.promises.unlink(filePath);
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      console.error(`Failed to remove file ${filePath}:`, error);
+    }
+  }
+}
+
 function sendOrderError(ctx, service) {
   service.resetChunk(ctx.session);
   return ctx.reply(
     "نوع پیام یا ترتیب اشتباه بود. بسته ریست شد؛ لطفاً دوباره با ارسال عکس (همراه کپشن) شروع کن."
   );
+}
+
+function formatServerTime() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+
+  const date = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  return `زمان سرور الان: ${date} ${time}`;
+}
+
+async function handleQuickSchedule(ctx, chunkService, scheduledAt) {
+  const chunk = chunkService.getChunk(ctx.session);
+
+  if (!chunk || chunk.step !== 3) {
+    await ctx.answerCbQuery("بسته کامل نیست.", { show_alert: true });
+    return;
+  }
+
+  if (!scheduledAt || !(scheduledAt instanceof Date) || Number.isNaN(scheduledAt.getTime())) {
+    await ctx.answerCbQuery("زمان نامعتبر است.", { show_alert: true });
+    return;
+  }
+
+  if (scheduledAt <= new Date()) {
+    await ctx.answerCbQuery("زمان باید در آینده باشد.", { show_alert: true });
+    return;
+  }
+
+  const result = chunkService.scheduleChunk(ctx.chat.id, ctx.session, scheduledAt);
+  await ctx.answerCbQuery();
+  await ctx.reply(result.message);
 }
 
 function registerChunkHandlers(bot, chunkService) {
@@ -77,7 +147,9 @@ function registerChunkHandlers(bot, chunkService) {
       chunkService.requestScheduleInput(ctx.session);
 
       return ctx.reply(
-        "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM وارد کن (ساعت اختیاری است). مثال: 17/02/2025 09:30"
+        "یکی از گزینه‌های زیر را انتخاب کن یا تاریخ و ساعت را دستی وارد کن. قالب: DD/MM/YYYY HH:MM\n" +
+          "مثال: 17/02/2025 09:30",
+        scheduleOptionsKeyboard
       );
     }
 
@@ -126,7 +198,23 @@ function registerChunkHandlers(bot, chunkService) {
     }
 
     chunkService.addAudio(ctx.session, ctx.message.audio, ctx.message.caption);
-    ctx.reply("صدا رسید! لطفاً حالا ویس را بفرست تا بسته کامل شود. 🎤");
+    ctx.reply(
+      "صدا رسید! میخوای همین آهنگو تبدیل به ویس کنم یا خودت ویس می‌فرستی؟",
+      Markup.inlineKeyboard([
+        [
+          Markup.button.callback(
+            "میخوای همین آهنگو تبدیل به ویس کنم؟",
+            ACTIONS.CONVERT_AUDIO
+          ),
+        ],
+        [
+          Markup.button.callback(
+            "نه خودم ویس دارم",
+            ACTIONS.SKIP_CONVERT
+          ),
+        ],
+      ])
+    );
   });
 
   // Voice
@@ -193,7 +281,58 @@ function registerChunkHandlers(bot, chunkService) {
     chunkService.requestScheduleInput(ctx.session);
     await ctx.answerCbQuery();
     await ctx.reply(
-      "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM بفرست (ساعت اختیاری است). مثال: 17/02/2025 09:30"
+      "یکی از گزینه‌های زیر را انتخاب کن یا تاریخ و ساعت را دستی وارد کن. قالب: DD/MM/YYYY HH:MM\n" +
+        "مثال: 17/02/2025 09:30",
+      scheduleOptionsKeyboard
+    );
+  });
+
+  bot.action(ACTIONS.SCHEDULE_IN_1H, async (ctx) => {
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 60 * 60 * 1000);
+    await handleQuickSchedule(ctx, chunkService, scheduledAt);
+  });
+
+  bot.action(ACTIONS.SCHEDULE_TOMORROW, async (ctx) => {
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    await handleQuickSchedule(ctx, chunkService, scheduledAt);
+  });
+
+  bot.action(ACTIONS.SCHEDULE_DAY_AFTER, async (ctx) => {
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    await handleQuickSchedule(ctx, chunkService, scheduledAt);
+  });
+
+  bot.action(ACTIONS.SCHEDULE_IN_2DAYS, async (ctx) => {
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+    await handleQuickSchedule(ctx, chunkService, scheduledAt);
+  });
+
+  bot.action(ACTIONS.SCHEDULE_NEXT_WEEK, async (ctx) => {
+    const now = new Date();
+    const scheduledAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    await handleQuickSchedule(ctx, chunkService, scheduledAt);
+  });
+
+  bot.action(ACTIONS.SCHEDULE_CUSTOM, async (ctx) => {
+    const chunk = chunkService.getChunk(ctx.session);
+
+    if (!chunk || chunk.step !== 3) {
+      await ctx.answerCbQuery("بسته کامل نیست.", { show_alert: true });
+      return;
+    }
+
+    chunkService.requestScheduleInput(ctx.session);
+    await ctx.answerCbQuery();
+
+    const serverTimeText = formatServerTime();
+    await ctx.reply(
+      "لطفاً تاریخ و ساعت را با قالب DD/MM/YYYY HH:MM بفرست (ساعت اختیاری است). مثال: 17/02/2025 09:30" +
+        "\n" +
+        serverTimeText
     );
   });
 
@@ -201,6 +340,65 @@ function registerChunkHandlers(bot, chunkService) {
     chunkService.resetChunk(ctx.session);
     await ctx.answerCbQuery("بسته لغو شد.");
     await ctx.reply("بسته فعلی لغو شد. هر وقت خواستی دوباره شروع کن!");
+  });
+
+  bot.action(ACTIONS.SKIP_CONVERT, async (ctx) => {
+    const chunk = chunkService.getChunk(ctx.session);
+
+    if (!chunk || chunk.step !== 2) {
+      await ctx.answerCbQuery("اول باید آهنگ ارسال شود.", { show_alert: true });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+    await ctx.reply("باشه، حالا ویس رو بفرست تا بسته کامل بشه. 🎤");
+  });
+
+  bot.action(ACTIONS.CONVERT_AUDIO, async (ctx) => {
+    const chunk = chunkService.getChunk(ctx.session);
+
+    if (!chunk || chunk.step !== 2 || !chunk.audio_file_id) {
+      await ctx.answerCbQuery("اول باید آهنگ ارسال شود.", { show_alert: true });
+      return;
+    }
+
+    await ctx.answerCbQuery();
+
+    let audioPath;
+    let oggPath;
+
+    try {
+      const telegramId = ctx.from.id;
+      audioPath = await downloadFile(chunk.audio_file_id, telegramId);
+      const duration = await getAudioDuration(audioPath);
+      oggPath = path.join(
+        __dirname,
+        "../../userdata",
+        `${telegramId}`,
+        `${chunk.audio_file_id}.ogg`
+      );
+
+      await convertToOgg(audioPath, oggPath, 0, duration);
+
+      const voiceMessage = await ctx.replyWithVoice({ source: oggPath });
+
+      chunkService.addVoice(
+        ctx.session,
+        voiceMessage.voice,
+        chunk.audio_caption || ""
+      );
+
+      await ctx.reply(
+        "ویس آماده شد! برای ارسال فوری /post را بفرست یا برای زمان‌بندی /schedule را ارسال کن.",
+        readyKeyboard
+      );
+    } catch (error) {
+      console.error("Failed to convert audio to voice", error);
+      await ctx.reply("تبدیل آهنگ به ویس با خطا مواجه شد. لطفاً ویس را خودت بفرست.");
+    } finally {
+      await safeRemove(oggPath);
+      await safeRemove(audioPath);
+    }
   });
 
   // Fallback for any other message types

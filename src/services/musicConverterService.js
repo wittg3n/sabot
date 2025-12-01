@@ -1,18 +1,30 @@
 const fs = require("fs");
-const ffmpeg = require("fluent-ffmpeg");
 const path = require("path");
+const ffmpeg = require("fluent-ffmpeg");
 
-const getAudioDuration = (filePath) => {
-  return new Promise((resolve, reject) => {
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) {
-        return reject(err);
-      }
-      const duration = metadata.format.duration;
-      resolve(duration);
-    });
+const getAudioDuration = (filePath) =>
+  new Promise((resolve, reject) => {
+    fs.promises
+      .access(filePath, fs.constants.F_OK)
+      .then(() => {
+        ffmpeg.ffprobe(filePath, (err, metadata) => {
+          if (err) {
+            reject(err);
+            return;
+          }
+
+          const duration = metadata?.format?.duration;
+
+          if (!Number.isFinite(duration)) {
+            reject(new Error(`Could not determine duration for file: ${filePath}`));
+            return;
+          }
+
+          resolve(duration);
+        });
+      })
+      .catch((err) => reject(err));
   });
-};
 
 const convertToOgg = async (inputFile, outputFile, startTime, duration) => {
   await fs.promises.access(inputFile, fs.constants.F_OK).catch(() => {
@@ -24,20 +36,15 @@ const convertToOgg = async (inputFile, outputFile, startTime, duration) => {
 
   return new Promise((resolve, reject) => {
     ffmpeg(inputFile)
-      .setStartTime(startTime)
+      .setStartTime(startTime ?? 0)
       .duration(duration)
       .audioCodec("libopus")
       .audioBitrate("25k")
-      .audioFilters("aformat=sample_rates=48000")
+      .audioFrequency(48000)
       .audioChannels(1)
-      .on("end", () => {
-        console.log(`Conversion finished successfully: ${outputFile}`);
-        resolve(outputFile);
-      })
-      .on("error", (error) => {
-        console.error("Error occurred during conversion:", error);
-        reject(error);
-      })
+      .outputOptions(["-y"])
+      .on("end", () => resolve(outputFile))
+      .on("error", (err) => reject(err))
       .save(outputFile);
   });
 };
