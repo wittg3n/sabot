@@ -228,7 +228,7 @@ class ChunkService {
   /**
    * لغو یک زمان‌بندی بر اساس id (فقط اگر متعلق به همان chat باشد)
    */
-  cancelScheduled(chatId, scheduledId) {
+  async cancelScheduled(chatId, scheduledId) {
     try {
       const scheduled = this.repository.getScheduledById(scheduledId);
 
