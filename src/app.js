@@ -9,6 +9,7 @@ const Database = require('./infrastructure/sqlite');
 const { createRedisClient, RedisSessionStore } = require('./infrastructure/redis');
 const environment = require('./config/environment');
 const logger = require('./logger');
+const accessControl = require('./bot/accessControl');
 
 async function createApp() {
   const config = environment.load();
@@ -39,6 +40,8 @@ async function createApp() {
       // عمداً نادیده می‌گیریم که اینجا دوباره کرش نکنیم
     }
   });
+
+  bot.use(accessControl);
 
   bot.use(
     session({
