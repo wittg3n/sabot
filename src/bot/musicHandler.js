@@ -1,5 +1,4 @@
-const { convertToOgg, getAudioDuration } = require("../utils/converter");
-const { downloadFile } = require("../utils/downloader");
+const { convertToOgg, getAudioDuration } = require("../services/musicConverterService");
 const query = require("../../config/inlineQueries");
 const path = require("path");
 const fs = require("fs");
@@ -35,19 +34,22 @@ async function getChannelName(bot, channelId) {
 
 module.exports = {
   musicToVoice: (bot) => {
-    let currentAudioFileId = null;
-
     bot.on("callback_query", async (ctx) => {
       if (!ctx.session) {
         ctx.session = {};
       }
 
       const callbackData = ctx.callbackQuery.data;
-      const chatId = ctx.session.chatId;
+      const chatId = ctx.chat?.id ?? ctx.session.chatId;
+
+      if (chatId) {
+        ctx.session.chatId = chatId;
+      }
 
       try {
         if (callbackData === "create_voice") {
-          currentAudioFileId = ctx.callbackQuery.message.audio.file_id;
+          const audioMessage = ctx.callbackQuery.message.audio;
+          ctx.session.currentAudioFileId = audioMessage?.file_id || null;
 
           const promptMessage = await ctx.reply(
             "لظفا زمان شروع را انتخاب کنید",
@@ -78,6 +80,7 @@ module.exports = {
           const duration = Number(callbackData.split("_")[1]);
           const telegramId = ctx.from.id;
           const audioFilePath = ctx.session.audioFilePath;
+          const currentAudioFileId = ctx.session.currentAudioFileId;
 
           if (!audioFilePath) {
             throw new Error("Audio file path not found in session.");
@@ -97,7 +100,13 @@ module.exports = {
             );
             ctx.session.oggFilePath = oggFilePath;
 
-            if (!fs.existsSync(oggFilePath)) {
+            try {
+              await fs.promises.access(oggFilePath, fs.constants.F_OK);
+            } catch (accessError) {
+              if (accessError.code !== "ENOENT") {
+                throw accessError;
+              }
+
               await convertToOgg(
                 audioFilePath,
                 oggFilePath,
@@ -188,8 +197,7 @@ module.exports = {
                 "خطایی در دریافت کانال‌ها رخ داد. لطفاً دوباره امتحان کنید."
               );
             }
-
-            currentAudioFileId = null;
+            ctx.session.currentAudioFileId = null;
             ctx.session.startTime = null;
           } else {
             await ctx.telegram.editMessageText(
@@ -241,7 +249,7 @@ module.exports = {
         }
       } catch (error) {
         console.error("Error processing request:", error.message);
-        await ctx.reply("مشکلی ئیش آمده دوباره امتحان کنید ");
+        await ctx.reply("مشکلی پیش آمده، دوباره امتحان کنید.");
       }
     });
 

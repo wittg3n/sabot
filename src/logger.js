@@ -7,7 +7,9 @@ const { createLogger, format, transports } = require('winston');
 const logDirectory = process.env.LOG_DIRECTORY || path.join(__dirname, '..', 'logs');
 const logLevel = process.env.LOG_LEVEL || 'info';
 
-fs.mkdirSync(logDirectory, { recursive: true });
+fs.promises
+  .mkdir(logDirectory, { recursive: true })
+  .catch((error) => console.error('Failed to ensure log directory', error));
 
 const logger = createLogger({
   level: logLevel,

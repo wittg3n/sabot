@@ -68,7 +68,6 @@ Install the following before running the bot:
 ```bash
 📦 sabot/
 ├── index.js                 # Entrypoint that wires and launches the bot
-├── sqlite-db.js             # SQLite helper for CLI-backed persistence
 ├── src/
 │   ├── app.js               # Application factory and scheduler bootstrap
 │   ├── config/

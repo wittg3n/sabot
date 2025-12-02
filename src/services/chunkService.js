@@ -1,11 +1,11 @@
 "use strict";
 
-const fs = require("fs");
+const fs = require("fs").promises;
 const path = require("path");
 const logger = require("../logger");
 
 // حذف فایل‌های مربوط به یک آهنگ/ویس کاربر
-function deleteUserFiles(telegramId, audioFileId) {
+async function deleteUserFiles(telegramId, audioFileId) {
   if (!telegramId || !audioFileId) {
     return;
   }
@@ -15,29 +15,32 @@ function deleteUserFiles(telegramId, audioFileId) {
   const mp3Path = path.join(baseDir, `${audioFileId}.mp3`);
   const oggPath = path.join(baseDir, `${audioFileId}.ogg`);
 
-  try {
-    if (fs.existsSync(mp3Path)) {
-      fs.unlinkSync(mp3Path);
-    }
-  } catch (err) {
-    logger.warn("Failed to delete mp3 file", {
-      telegramId,
-      audioFileId,
-      error: err.message,
-    });
-  }
+  const removeFile = async (filePath, label) => {
+    try {
+      await fs.unlink(filePath);
+      logger.debug?.("Deleted user file", { telegramId, audioFileId, filePath });
+    } catch (err) {
+      if (err.code === "ENOENT") {
+        logger.debug?.("User file already removed", {
+          telegramId,
+          audioFileId,
+          filePath,
+        });
+        return;
+      }
 
-  try {
-    if (fs.existsSync(oggPath)) {
-      fs.unlinkSync(oggPath);
+      logger.warn(`Failed to delete ${label} file`, {
+        telegramId,
+        audioFileId,
+        error: err.message,
+      });
     }
-  } catch (err) {
-    logger.warn("Failed to delete ogg file", {
-      telegramId,
-      audioFileId,
-      error: err.message,
-    });
-  }
+  };
+
+  await Promise.all([
+    removeFile(mp3Path, "mp3"),
+    removeFile(oggPath, "ogg"),
+  ]);
 }
 
 class ChunkService {
@@ -172,7 +175,7 @@ class ChunkService {
       // پاک کردن فایل‌های mp3 و ogg مربوط به این آهنگ/ویس
       try {
         const telegramId = chatId; // در چت خصوصی، chat_id همان تلگرام آیدی کاربر است
-        deleteUserFiles(telegramId, chunk.audio_file_id);
+        await deleteUserFiles(telegramId, chunk.audio_file_id);
       } catch (cleanupError) {
         logger.warn("Failed to cleanup files after immediate post", {
           chatId,
@@ -246,7 +249,7 @@ class ChunkService {
       // پاک کردن فایل‌های mp3 و ogg مربوط به این برنامه
       try {
         const telegramId = scheduled.chat_id;
-        deleteUserFiles(telegramId, scheduled.audio_file_id);
+        await deleteUserFiles(telegramId, scheduled.audio_file_id);
       } catch (cleanupError) {
         logger.warn("Failed to cleanup files after canceling scheduled post", {
           chatId,
@@ -292,7 +295,7 @@ class ChunkService {
         // پاک کردن فایل‌های mp3 و ogg مربوط به این آهنگ/ویس
         try {
           const telegramId = scheduled.chat_id;
-          deleteUserFiles(telegramId, scheduled.audio_file_id);
+          await deleteUserFiles(telegramId, scheduled.audio_file_id);
         } catch (cleanupError) {
           logger.warn("Failed to cleanup files after scheduled post", {
             chatId: scheduled.chat_id,

@@ -1,11 +1,14 @@
 const path = require("path");
 const fs = require("fs");
+const { getBotToken } = require("../config/environment");
 
 const downloadFile = async (fileId, telegramId) => {
   try {
     console.log("we are in downloader.js");
+
+    const botToken = getBotToken();
     const getFileUrl = new URL(
-      `https://api.telegram.org/bot${process.env.BOT_TOKEN}/getFile`
+      `https://api.telegram.org/bot${botToken}/getFile`
     );
     getFileUrl.searchParams.set("file_id", fileId);
 
@@ -22,7 +25,7 @@ const downloadFile = async (fileId, telegramId) => {
       throw new Error("Telegram did not return a file path for the audio.");
     }
 
-    const downloadUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${filePath}`;
+    const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${filePath}`;
     const response = await fetch(downloadUrl);
 
     if (!response.ok) {
@@ -33,14 +36,10 @@ const downloadFile = async (fileId, telegramId) => {
 
     const outputDir = path.join(__dirname, "../../userdata", String(telegramId));
 
-    if (!fs.existsSync(outputDir)) {
-      fs.mkdirSync(outputDir, { recursive: true });
-      console.log(`Directory created: ${outputDir}`);
-    }
-
+    await fs.promises.mkdir(outputDir, { recursive: true });
     const fileOutputPath = path.join(outputDir, `${fileId}.mp3`);
 
-    fs.writeFileSync(fileOutputPath, fileBuffer);
+    await fs.promises.writeFile(fileOutputPath, fileBuffer);
     console.log(`File successfully downloaded: ${fileOutputPath}`);
     return fileOutputPath;
   } catch (error) {
