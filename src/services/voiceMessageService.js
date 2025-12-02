@@ -5,21 +5,13 @@ const fs = require("fs");
 const axios = require("axios");
 const FormData = require("form-data");
 const logger = require("../logger");
-
-// مطمئن می‌شیم .env (اگر هست) لود شده
-require("dotenv").config();
-
-function getBotToken() {
-  // اول BOT_TOKEN (مطابق environment.js)
-  // اگر نباشد، برای سازگاری با تنظیمات قبلی، TOKEN را هم چک می‌کنیم
-  return process.env.BOT_TOKEN || process.env.TOKEN || null;
-}
+const { getBotToken } = require("../config/environment");
 
 const sendVoiceMessage = async (telegramId, oggFilePath) => {
   const botToken = getBotToken();
 
   if (!botToken) {
-    const msg = "BOT_TOKEN (or TOKEN) is not configured in environment";
+    const msg = "BOT_TOKEN is not configured in environment";
     logger.error(msg, { chatId: telegramId, oggFilePath });
     throw new Error(msg);
   }

@@ -1,5 +1,7 @@
 'use strict';
 
+// This uses synchronous sqlite3 calls and blocks the event loop; acceptable for low traffic but should be refactored later.
+
 const { execFileSync } = require('child_process');
 
 function escapeValue(value) {

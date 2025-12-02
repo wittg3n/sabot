@@ -1,6 +1,8 @@
 "use strict";
 
-require("dotenv").config();
+const dotenv = require("dotenv");
+
+let cachedConfig = null;
 
 function getRequiredEnv(name) {
   const value = process.env[name];
@@ -10,13 +12,28 @@ function getRequiredEnv(name) {
   return value;
 }
 
+function load() {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  dotenv.config();
+
+  cachedConfig = {
+    botToken: getRequiredEnv("BOT_TOKEN"),
+    channelId: getRequiredEnv("CHANNEL_ID"),
+    databasePath: getRequiredEnv("DATABASE_PATH"),
+    redisUrl: getRequiredEnv("REDIS_URL"),
+  };
+
+  return cachedConfig;
+}
+
+function getBotToken() {
+  return load().botToken;
+}
+
 module.exports = {
-  load() {
-    return {
-      botToken: getRequiredEnv("BOT_TOKEN"),
-      channelId: getRequiredEnv("CHANNEL_ID"),
-      databasePath: process.env.DATABASE_PATH,
-      redisUrl: process.env.REDIS_URL,
-    };
-  },
+  load,
+  getBotToken,
 };
